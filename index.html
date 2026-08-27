@@ -176,6 +176,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   color:#fff;
 }
 
+
+.wizardProgress{display:flex;gap:7px;margin:0 0 16px}
+.wizardDot{height:6px;flex:1;border-radius:10px;background:#e5e7ea}
+.wizardDot.active{background:var(--orange)}
+.wizardStep{display:none}
+.wizardStep.active{display:block}
+.wizardNav{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.wizardNav.single{grid-template-columns:1fr}
+.wizardTitle{font-size:14px;font-weight:900;color:var(--orange);margin:0 0 13px}
+
 @media(max-width:390px){
   .app{width:100%}
   .card{margin-left:12px;margin-right:12px}
@@ -331,6 +341,107 @@ let cfg={vendor:[],keterangan:[],users:[]}, session=null, moduleName='', awbs=[]
 let scanner=null, scanLock=false, driverPhotoStream=null, snPhotoStream=null;
 
 const $=id=>document.getElementById(id);
+
+let wizardStep=1;
+
+function buildModuleWizard(){
+  const form=$('moduleForm') || $('formCard') || document.querySelector('.formCard') || document.querySelector('#moduleScreen .card');
+  if(!form || form.dataset.wizardBuilt==='1')return;
+  form.dataset.wizardBuilt='1';
+
+  // Locate existing sections by controls so functionality/IDs remain unchanged.
+  const driver=$('driverName');
+  const awb=$('awbList');
+  const driverCam=$('btnOpenDriverCamera');
+  const sn=$('snSection');
+  const saveBtn=document.querySelector('[onclick="saveData()"]');
+
+  if(!driver || !awb || !driverCam || !saveBtn)return;
+
+  function nearestBlock(el){
+    let p=el;
+    while(p && p!==form){
+      if(p.classList && (p.classList.contains('section') || p.classList.contains('photoBox'))) return p;
+      p=p.parentElement;
+    }
+    return el.parentElement;
+  }
+
+  const manualStart=nearestBlock(driver);
+  const awbBlock=nearestBlock(awb);
+  const photoDriverBlock=nearestBlock(driverCam);
+  const photoSnBlock=sn;
+
+  // Build wizard shell.
+  const shell=document.createElement('div');
+  shell.id='wizardShell';
+  shell.innerHTML=`
+    <div class="wizardProgress">
+      <div class="wizardDot active" data-dot="1"></div>
+      <div class="wizardDot" data-dot="2"></div>
+      <div class="wizardDot" data-dot="3"></div>
+    </div>
+    <div id="wizard1" class="wizardStep active"><div class="wizardTitle">1 · INPUT DATA MANUAL</div></div>
+    <div id="wizard2" class="wizardStep"><div class="wizardTitle">2 · SCAN AWB</div></div>
+    <div id="wizard3" class="wizardStep"><div class="wizardTitle">3 · FOTO DRIVER & FOTO SN</div></div>
+  `;
+
+  form.insertBefore(shell,manualStart);
+
+  const w1=$('wizard1'),w2=$('wizard2'),w3=$('wizard3');
+
+  // Move manual controls: driver through vendor (the section containing driver).
+  w1.appendChild(manualStart);
+
+  const n1=document.createElement('div');
+  n1.className='wizardNav single';
+  n1.innerHTML='<button class="btn primary" type="button" onclick="wizardNext(2)">SELANJUTNYA →</button>';
+  w1.appendChild(n1);
+
+  // AWB
+  w2.appendChild(awbBlock);
+  const n2=document.createElement('div');
+  n2.className='wizardNav';
+  n2.innerHTML='<button class="btn dark" type="button" onclick="wizardNext(1)">← KEMBALI</button><button class="btn primary" type="button" onclick="wizardNext(3)">SELANJUTNYA →</button>';
+  w2.appendChild(n2);
+
+  // Photos and save
+  w3.appendChild(photoDriverBlock);
+  if(photoSnBlock && photoSnBlock!==photoDriverBlock)w3.appendChild(photoSnBlock);
+  w3.appendChild(saveBtn);
+
+  const back=document.createElement('button');
+  back.className='btn dark';
+  back.type='button';
+  back.style.marginTop='10px';
+  back.textContent='← KEMBALI';
+  back.onclick=()=>wizardNext(2);
+  w3.appendChild(back);
+
+  wizardNext(1);
+}
+
+function wizardNext(step){
+  // Basic stage validation
+  if(step===2){
+    if(!$('driverName').value.trim())return status('saveStatus','Nama Driver wajib diisi.','bad');
+    if(!$('plateNo').value.trim())return status('saveStatus','Plat No wajib diisi.','bad');
+    if(!$('vendor').value)return status('saveStatus','Vendor wajib dipilih.','bad');
+  }
+  if(step===3 && !awbs.length){
+    return status('saveStatus','Scan / Input minimal 1 AWB terlebih dahulu.','bad');
+  }
+
+  wizardStep=step;
+  [1,2,3].forEach(i=>{
+    const s=$('wizard'+i),d=document.querySelector('[data-dot="'+i+'"]');
+    if(s)s.classList.toggle('active',i===step);
+    if(d)d.classList.toggle('active',i<=step);
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+
 function status(id,msg,type='wait'){const el=$(id);el.className='status show '+type;el.textContent=msg}
 function hideStatus(id){$(id).className='status'}
 function jsonp(params,timeout=12000){return new Promise((resolve,reject)=>{if(API_URL.includes('PASTE_')) return reject(new Error('API_URL belum diisi di index.html')); const cb='cb_'+Date.now()+'_'+Math.random().toString(36).slice(2); const s=document.createElement('script'); const t=setTimeout(()=>{cleanup();reject(new Error('Timeout ke server'))},timeout); function cleanup(){clearTimeout(t);delete window[cb];s.remove()} window[cb]=d=>{cleanup();resolve(d)}; s.onerror=()=>{cleanup();reject(new Error('Gagal terhubung ke Apps Script'))}; const q=new URLSearchParams({...params,callback:cb,_:Date.now()}); s.src=API_URL+'?'+q; document.head.appendChild(s);})}
@@ -348,7 +459,7 @@ function addAWB(v){
   if(awbs.includes(v)){logDoubleScan(v);return;}
   if(moduleName==='return'&&awbs.length){awbs=[v]}else{awbs.push(v)}
   renderAWB();beep();
-}
+;setTimeout(buildModuleWizard,0)}
 function manualAWB(){
   const overlay=$('awbModalOverlay');
   const input=$('manualAwbInput');
