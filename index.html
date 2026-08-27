@@ -251,10 +251,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
         <div class="wizardTitle">1 · INPUT DATA MANUAL</div>
 
       <label>Nama Driver</label>
-      <input id="driverName" placeholder="Nama Driver">
+      <input id="driverName" placeholder="Nama Driver" autocapitalize="characters" oninput="this.value=this.value.toUpperCase()">
 
       <label>Plat No</label>
-      <input id="plateNo" placeholder="Contoh: F 1234 ABC" autocapitalize="characters">
+      <input id="plateNo" placeholder="Contoh: F 1234 ABC" autocapitalize="characters" oninput="this.value=this.value.toUpperCase()">
 
       <label>Vendor</label>
       <select id="vendor"><option value="">Pilih Vendor</option></select>
@@ -368,7 +368,7 @@ if('serviceWorker' in navigator){
 }
 
 // GANTI setelah deploy Apps Script Web App (/exec)
-const API_URL = 'https://script.google.com/macros/s/AKfycbwvSTmZkm9CGrEW3kJG8Du_THFSNX0fE49y97wElfXzANkfewhp-LuMtyPqZD8P4DWwCg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwx52muo2JAdLMH4T4-1v08MjoqgO5xkka2URHoHkUblCEd94LkeXDrOo1UeVO0SDnFfg/exec';
 let cfg={vendor:[],keterangan:[],users:[]}, session=null, moduleName='', awbs=[], snItems=[], driverPhoto='';
 let scanner=null, scanLock=false, driverPhotoStream=null, snPhotoStream=null;
 
@@ -1023,7 +1023,7 @@ function logDoubleScan(awb,doubleSource='SESSION',outboundRow=''){
     module:moduleName||'',
     username:session?session.username:'',
     origin:session?session.origin:'',
-    driverName:$('driverName')?$('driverName').value.trim():'',
+    driverName:$('driverName')?$('driverName').value.trim().toUpperCase():'',
     plateNo:$('plateNo')?$('plateNo').value.trim().toUpperCase():'',
     vendor:$('vendor')?$('vendor').value:'',
     doubleSource:doubleSource,
@@ -1056,7 +1056,7 @@ function logDoubleScan(awb,doubleSource='SESSION',outboundRow=''){
   if(navigator.vibrate)navigator.vibrate([120,80,120]);
 }
 
-async function saveData(){await stopScanner();closeDriverCamera();closeSnCamera();const v=validate();if(v)return status('saveStatus',v,'bad');const requestId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));const payload={requestId,module:moduleName,username:session.username,origin:session.origin,awbs,driverName:$('driverName').value.trim(),plateNo:$('plateNo').value.trim().toUpperCase(),vendor:$('vendor').value,keterangan:$('keterangan').value,reason:$('reason').value.trim(),driverPhoto,sns:snItems.map(()=>''),snPhotos:snItems.map(x=>x.photo)};$('saveBtn').disabled=true;status('saveStatus','Mengupload foto dan menyimpan data...','wait');try{if(API_URL.includes('PASTE_'))throw new Error('Isi API_URL pada index.html dengan URL Apps Script /exec'); const fd=new URLSearchParams();fd.set('payload',JSON.stringify(payload)); await fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:fd.toString()}); const ok=await waitStatus(requestId);if(!ok.ok)throw new Error(ok.message||'Gagal menyimpan');status('saveStatus',ok.message||'Data tersimpan','ok');setTimeout(()=>goHome(),1200)}catch(e){status('saveStatus',e.message,'bad')}finally{$('saveBtn').disabled=false}}
+async function saveData(){await stopScanner();closeDriverCamera();closeSnCamera();const v=validate();if(v)return status('saveStatus',v,'bad');const requestId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));const payload={requestId,module:moduleName,username:session.username,origin:session.origin,awbs,driverName:$('driverName').value.trim().toUpperCase(),plateNo:$('plateNo').value.trim().toUpperCase(),vendor:$('vendor').value,keterangan:$('keterangan').value,reason:$('reason').value.trim(),driverPhoto,sns:snItems.map(()=>''),snPhotos:snItems.map(x=>x.photo)};$('saveBtn').disabled=true;status('saveStatus','Mengupload foto dan menyimpan data...','wait');try{if(API_URL.includes('PASTE_'))throw new Error('Isi API_URL pada index.html dengan URL Apps Script /exec'); const fd=new URLSearchParams();fd.set('payload',JSON.stringify(payload)); await fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:fd.toString()}); const ok=await waitStatus(requestId);if(!ok.ok)throw new Error(ok.message||'Gagal menyimpan');status('saveStatus',ok.message||'Data tersimpan','ok');setTimeout(()=>goHome(),1200)}catch(e){status('saveStatus',e.message,'bad')}finally{$('saveBtn').disabled=false}}
 async function waitStatus(id){
   for(let i=0;i<30;i++){
     await new Promise(r=>setTimeout(r,1000));
