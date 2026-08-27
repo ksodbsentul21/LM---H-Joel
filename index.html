@@ -283,7 +283,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
         <div id="awbList" class="awbListVertical"></div>
       </div>
 
-      <div class="muted" style="margin-top:8px">AWB yang sudah ada di Outbound atau ter-scan dua kali akan otomatis dicatat ke sheet Double Scan dan tidak masuk daftar simpan.</div>
       <div id="reader" class="inlineScanner"></div>
       <div class="row" style="margin-top:10px">
         <button class="btn dark" id="btnStartScanner" onclick="scanAWB()">▥ SCAN AWB</button>
@@ -368,7 +367,7 @@ if('serviceWorker' in navigator){
 }
 
 // PENTING: API_URL harus memakai deployment /exec yang berisi Code.gs terbaru, bukan deployment lama.
-const API_URL = 'https://script.google.com/macros/s/AKfycbwx52muo2JAdLMH4T4-1v08MjoqgO5xkka2URHoHkUblCEd94LkeXDrOo1UeVO0SDnFfg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwvSTmZkm9CGrEW3kJG8Du_THFSNX0fE49y97wElfXzANkfewhp-LuMtyPqZD8P4DWwCg/exec';
 let cfg={vendor:[],keterangan:[],users:[]}, session=null, moduleName='', awbs=[], snItems=[], driverPhoto='';
 let scanner=null, scanLock=false, driverPhotoStream=null, snPhotoStream=null;
 
@@ -570,53 +569,20 @@ function resetForm(){
   awbListCollapsed=false;
   try{enforceSnLimit()}catch(e){console.error('enforceSnLimit',e)}
 }
-async function checkAwbInOutbound(awb){
-  const value=String(awb||'').trim().toUpperCase();
-  if(!value)return {ok:false,exists:false};
+async function addAWB(v){
+  v=String(v||'').trim().toUpperCase();
+  if(!v)return false;
 
-  try{
-    return await jsonp({
-      action:'checkAwb',
-      awb:value
-    },10000);
-  }catch(e){
-    console.warn('Check AWB Outbound gagal:',e);
-    // Jika server pengecekan gagal, jangan blok operasional scan.
-    return {ok:false,exists:false,checkError:true};
-  }
-}
-
-async function processAwbInput(rawAwb){
-  const awb=String(rawAwb||'').trim().toUpperCase();
-  if(!awb)return false;
-
-  // 1. Double dalam sesi aktif.
-  if(awbs.includes(awb)){
+  if(awbs.includes(v)){
     beepDuplicate();
-    logDoubleScan(awb,'SESSION','');
+    logDoubleScan(v);
     return false;
   }
-
-  // 2. Double terhadap data yang sudah pernah tersimpan di Outbound.
-  status('saveStatus','Memeriksa AWB '+awb+'...','wait');
-  const check=await checkAwbInOutbound(awb);
-
-  if(check && check.exists){
-    beepDuplicate();
-    logDoubleScan(
-      awb,
-      'OUTBOUND',
-      check.outboundRow||''
-    );
-    return false;
-  }
-
-  hideStatus('saveStatus');
 
   if(moduleName==='return' && awbs.length){
-    awbs=[awb];
+    awbs=[v];
   }else{
-    awbs.push(awb);
+    awbs.push(v);
   }
 
   renderAWB();
@@ -624,10 +590,6 @@ async function processAwbInput(rawAwb){
   return true;
 }
 
-
-async function addAWB(v){
-  return await processAwbInput(v);
-}
 function manualAWB(){
   const overlay=$('awbModalOverlay');
   const input=$('manualAwbInput');
@@ -663,14 +625,8 @@ async function submitManualAWB(){
     return;
   }
 
-  const saved=await processAwbInput(value);
-
-  if(saved || awbs.includes(value)){
-    closeAwbModal();
-  }else{
-    // Double scan sudah tercatat, modal ditutup agar operator bisa lanjut.
-    closeAwbModal();
-  }
+  await addAWB(value);
+  closeAwbModal();
 }
 
 document.addEventListener('keydown',function(e){
@@ -767,14 +723,14 @@ async function scanAWB(){
 
         if(moduleName==='return'){
           if(awbs.length<1){
-            const accepted=await processAwbInput(awb);
+            const accepted=await addAWB(awb);
             if(accepted)await stopScanner();
           }
           scanLock=false;
           return;
         }
 
-        await processAwbInput(awb);
+        await addAWB(awb);
         setTimeout(()=>scanLock=false,900);
       },
       function(){}
@@ -1050,7 +1006,7 @@ function validate(){if(!awbs.length)return 'AWB belum di-scan';if(moduleName==='
 if(snItems.length>awbs.length)return 'Jumlah Foto SN tidak boleh melebihi jumlah AWB';
 return ''}
 
-function logDoubleScan(awb,doubleSource='SESSION',outboundRow=''){
+function logDoubleScan(awb){
   const payload={
     action:'doubleScan',
     awb:String(awb||'').trim().toUpperCase(),
@@ -1059,9 +1015,7 @@ function logDoubleScan(awb,doubleSource='SESSION',outboundRow=''){
     origin:session?session.origin:'',
     driverName:$('driverName')?$('driverName').value.trim().toUpperCase():'',
     plateNo:$('plateNo')?$('plateNo').value.trim().toUpperCase():'',
-    vendor:$('vendor')?$('vendor').value:'',
-    doubleSource:doubleSource,
-    outboundRow:outboundRow
+    vendor:$('vendor')?$('vendor').value:''
   };
 
   const fd=new URLSearchParams();
@@ -1070,20 +1024,13 @@ function logDoubleScan(awb,doubleSource='SESSION',outboundRow=''){
   fetch(API_URL,{
     method:'POST',
     mode:'no-cors',
-    headers:{
-      'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'
-    },
+    headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
     body:fd.toString()
   }).catch(e=>console.warn('Double Scan log gagal:',e));
 
-  const sourceText=
-    doubleSource==='OUTBOUND'
-      ? 'sudah ada di sheet Outbound'
-      : 'sudah discan pada sesi ini';
-
   status(
     'saveStatus',
-    'AWB '+awb+' double ('+sourceText+') dan dicatat ke sheet Double Scan.',
+    'AWB '+awb+' sudah discan pada proses ini dan dicatat ke sheet Double Scan.',
     'bad'
   );
 
