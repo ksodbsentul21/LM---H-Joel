@@ -10,6 +10,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icon-192.png" />
 <title>Last Mile - H Joel Logistics</title>
+<meta name="app-version" content="wizard-3-step-v2">
 <script src="https://unpkg.com/html5-qrcode"></script>
 <style>
 
@@ -246,7 +247,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
         <div class="wizardDot" data-dot="3"></div>
       </div>
 
-      <div id="stepManual" class="wizardStep active">
+      <div id="stepManual" class="wizardStep active" style="display:block">
         <div class="wizardTitle">1 · INPUT DATA MANUAL</div>
 
       <label>Nama Driver</label>
@@ -268,7 +269,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
         </div>
       </div>
 
-      <div id="stepAwb" class="wizardStep">
+      <div id="stepAwb" class="wizardStep" style="display:none">
         <div class="wizardTitle">2 · SCAN AWB</div>
       <label>AWB</label>
       <div class="awbPanel">
@@ -296,7 +297,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
         </div>
       </div>
 
-      <div id="stepPhoto" class="wizardStep">
+      <div id="stepPhoto" class="wizardStep" style="display:none">
         <div class="wizardTitle">3 · FOTO DRIVER & FOTO SN</div>
 
 
@@ -361,6 +362,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   <div class="footer">H JOEL LOGISTICS · LAST MILE</div>
 </div>
 <script>
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
+}
 
 // GANTI setelah deploy Apps Script Web App (/exec)
 const API_URL = 'https://script.google.com/macros/s/AKfycbwx52muo2JAdLMH4T4-1v08MjoqgO5xkka2URHoHkUblCEd94LkeXDrOo1UeVO0SDnFfg/exec';
@@ -383,6 +387,9 @@ function showWizardStep(step){
   $('stepManual').classList.toggle('active',step===1);
   $('stepAwb').classList.toggle('active',step===2);
   $('stepPhoto').classList.toggle('active',step===3);
+  $('stepManual').style.display=step===1?'block':'none';
+  $('stepAwb').style.display=step===2?'block':'none';
+  $('stepPhoto').style.display=step===3?'block':'none';
 
   document.querySelectorAll('[data-dot]').forEach((d,i)=>{
     d.classList.toggle('active',(i+1)<=step);
@@ -408,6 +415,7 @@ function addAWB(v){
   if(awbs.includes(v)){logDoubleScan(v);return;}
   if(moduleName==='return'&&awbs.length){awbs=[v]}else{awbs.push(v)}
   renderAWB();beep();
+}
 function manualAWB(){
   const overlay=$('awbModalOverlay');
   const input=$('manualAwbInput');
@@ -872,5 +880,5 @@ async function waitStatus(id){
   throw new Error('Server belum memberi konfirmasi. Cek Apps Script dan koneksi internet.');
 }
 
-(async()=>{if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});await loadConfig();try{session=JSON.parse(localStorage.getItem('hjoelSession')||'null')}catch(_){ } if(session){try{const d=await jsonp({action:'login',username:session.username});if(d.ok&&d.origin===session.origin)showHome();else logout()}catch(_){logout()}}})();
+(async()=>{await loadConfig();try{session=JSON.parse(localStorage.getItem('hjoelSession')||'null')}catch(_){ } if(session){try{const d=await jsonp({action:'login',username:session.username});if(d.ok&&d.origin===session.origin)showHome();else logout()}catch(_){logout()}}})();
 </script></body></html>
