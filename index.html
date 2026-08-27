@@ -299,6 +299,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
           <div id="snList"></div>
           <div id="snPreview" class="hidden"></div>
           <div class="snLimit" id="snLimitInfo">Maksimal Foto SN = Jumlah AWB (0)</div>
+          <div class="muted" style="margin-top:7px">Foto disimpan full. Sistem hanya membaca barcode pada bagian atas foto. Jika No SN belum terbaca, data tetap dapat disimpan.</div>
         </div>
       </div>
 
@@ -656,7 +657,7 @@ async function captureSnPhoto(){
       'No SN terbaca: '+sn+' · Foto SN '+taken+'/'+max;
   }else{
     $('ocrProgress').textContent=
-      'Foto SN '+taken+'/'+max+' tersimpan. No SN belum terbaca, silakan isi manual.';
+      'Foto SN '+taken+'/'+max+' tersimpan. No SN belum terbaca. Data tetap bisa disimpan atau No SN dapat diisi manual.';
   }
 
   // Kamera tetap aktif agar bisa foto SN berikutnya seperti scan berulang.
@@ -698,9 +699,34 @@ function closeSnCamera(){
 
 async function readTopBarcodeFromCanvas(canvas){
   /*
-    BarcodeDetector diprioritaskan.
-    Bila ada beberapa barcode dalam satu foto,
-    barcode dengan posisi paling atas dipilih sebagai No SN.
+    FOTO YANG DISIMPAN TETAP FULL.
+    Untuk membaca No SN, sistem hanya memproses bagian ATAS foto
+    agar barcode bawah (EAN/produk) tidak ikut terbaca.
+  */
+
+  const crop=document.createElement('canvas');
+  const ctx=crop.getContext('2d');
+
+  // Ambil sekitar 40% bagian atas foto.
+  // Ini cukup untuk area barcode SN pada label contoh Hisense.
+  const cropHeight=Math.max(
+    160,
+    Math.floor(canvas.height*0.40)
+  );
+
+  crop.width=canvas.width;
+  crop.height=Math.min(cropHeight,canvas.height);
+
+  ctx.drawImage(
+    canvas,
+    0,0,
+    canvas.width,crop.height,
+    0,0,
+    crop.width,crop.height
+  );
+
+  /*
+    Prioritas 1: BarcodeDetector
   */
   if('BarcodeDetector' in window){
     try{
@@ -722,9 +748,13 @@ async function readTopBarcodeFromCanvas(canvas){
         wanted.length ? {formats:wanted} : undefined
       );
 
-      const codes=await detector.detect(canvas);
+      const codes=await detector.detect(crop);
 
       if(codes && codes.length){
+        /*
+          Jika ada lebih dari satu barcode di area atas,
+          tetap prioritaskan yang paling atas.
+        */
         codes.sort((a,b)=>{
           const ay=(a.boundingBox&&a.boundingBox.y)||0;
           const by=(b.boundingBox&&b.boundingBox.y)||0;
@@ -743,12 +773,13 @@ async function readTopBarcodeFromCanvas(canvas){
   }
 
   /*
-    Fallback html5-qrcode:
-    ubah canvas ke File lalu scan sebagai gambar.
+    Prioritas 2: html5-qrcode
+    Yang discan juga hanya hasil crop bagian atas,
+    BUKAN foto full.
   */
   try{
     const blob=await new Promise(resolve=>{
-      canvas.toBlob(resolve,'image/jpeg',.92);
+      crop.toBlob(resolve,'image/jpeg',.95);
     });
 
     if(!blob){
@@ -757,7 +788,7 @@ async function readTopBarcodeFromCanvas(canvas){
 
     const file=new File(
       [blob],
-      'sn.jpg',
+      'sn-top.jpg',
       {type:'image/jpeg'}
     );
 
@@ -881,7 +912,6 @@ function closeDriverCamera(){
 
 function validate(){if(!awbs.length)return 'AWB belum di-scan';if(moduleName==='return'&&awbs.length!==1)return 'Return harus 1 AWB';if(!$('driverName').value.trim())return 'Nama Driver wajib diisi';if(!$('plateNo').value.trim())return 'Plat No wajib diisi';if(!$('vendor').value)return 'Vendor wajib dipilih';if(moduleName!=='return'&&!driverPhoto)return 'Foto Driver wajib diambil';if(moduleName==='return'&&!$('keterangan').value)return 'Keterangan wajib dipilih';if(moduleName==='return'&&!$('reason').value.trim())return 'Reason wajib diisi';if((moduleName==='outbound'||moduleName==='return')&&!snItems.length)return 'Foto SN wajib diambil';
 if(snItems.length>awbs.length)return 'Jumlah Foto SN tidak boleh melebihi jumlah AWB';
-if(snItems.some(x=>!String(x.sn||'').trim()))return 'Masih ada No SN yang kosong / belum terbaca';
 return ''}
 async function saveData(){await stopScanner();closeDriverCamera();closeSnCamera();const v=validate();if(v)return status('saveStatus',v,'bad');const requestId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));const payload={requestId,module:moduleName,username:session.username,origin:session.origin,awbs,driverName:$('driverName').value.trim(),plateNo:$('plateNo').value.trim().toUpperCase(),vendor:$('vendor').value,keterangan:$('keterangan').value,reason:$('reason').value.trim(),driverPhoto,sns:snItems.map(x=>x.sn),snPhotos:snItems.map(x=>x.photo)};$('saveBtn').disabled=true;status('saveStatus','Mengirim data...','wait');try{if(API_URL.includes('PASTE_'))throw new Error('Isi API_URL pada index.html dengan URL Apps Script /exec'); const fd=new URLSearchParams();fd.set('payload',JSON.stringify(payload)); await fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:fd.toString()}); const ok=await waitStatus(requestId);if(!ok.ok)throw new Error(ok.message||'Gagal menyimpan');status('saveStatus',ok.message||'Data tersimpan','ok');setTimeout(()=>goHome(),1200)}catch(e){status('saveStatus',e.message,'bad')}finally{$('saveBtn').disabled=false}}
 async function waitStatus(id){for(let i=0;i<12;i++){await new Promise(r=>setTimeout(r,1000));try{const d=await jsonp({action:'status',requestId:id},5000);if(!d.pending)return d}catch(e){}}throw new Error('Server belum memberi konfirmasi. Cek Apps Script dan Sheet.')}
