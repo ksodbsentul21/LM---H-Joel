@@ -97,6 +97,85 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 .loginInfo{margin-top:16px;background:#f5f5f5;border-radius:9px;padding:14px;font-size:13px}
 .sectionCap{font-size:14px;font-weight:900;color:var(--orange);margin:18px 0 8px}
 .footer{text-align:center;color:#a0a0a0;font-size:10px;margin:20px 0}
+
+/* Modal Input AWB */
+.awbModalOverlay{
+  position:fixed;
+  inset:0;
+  background:rgba(15,18,22,.58);
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  z-index:9999;
+}
+.awbModal{
+  width:min(100%,390px);
+  background:#fff;
+  border-radius:18px;
+  padding:20px;
+  box-shadow:0 22px 60px rgba(0,0,0,.28);
+  animation:awbPop .18s ease-out;
+}
+@keyframes awbPop{
+  from{transform:translateY(10px) scale(.98);opacity:0}
+  to{transform:translateY(0) scale(1);opacity:1}
+}
+.awbModalTitle{
+  font-size:18px;
+  font-weight:900;
+  color:var(--orange);
+  text-align:center;
+  margin-bottom:6px;
+}
+.awbModalHint{
+  font-size:12px;
+  color:var(--muted);
+  text-align:center;
+  line-height:1.45;
+  margin-bottom:14px;
+}
+.awbModalInput{
+  width:100%;
+  min-height:52px;
+  border:1px solid #d9dde2;
+  border-radius:11px;
+  padding:13px 14px;
+  font-size:16px;
+  font-weight:700;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+  outline:none;
+}
+.awbModalInput:focus{
+  border-color:var(--orange);
+  box-shadow:0 0 0 4px rgba(255,101,0,.12);
+}
+.awbModalActions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+  margin-top:13px;
+}
+.awbModalBtn{
+  min-height:47px;
+  border:0;
+  border-radius:9px;
+  font-size:14px;
+  font-weight:900;
+  cursor:pointer;
+}
+.awbModalBtn.cancel{
+  background:#f1f2f4;
+  color:#34393e;
+}
+.awbModalBtn.save{
+  background:var(--orange);
+  color:#fff;
+}
+
 @media(max-width:390px){
   .app{width:100%}
   .card{margin-left:12px;margin-right:12px}
@@ -168,7 +247,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
       <div class="row" style="margin-top:10px">
         <button class="btn dark" id="btnStartScanner" onclick="scanAWB()">▥ SCAN AWB</button>
         <button class="btn danger hidden" id="btnStopScanner" onclick="stopScanner()">⛔ STOP SCANNER</button>
-        <button class="btn soft" onclick="manualAWB()">＋ TAMBAH AWB MANUAL</button>
+        <button class="btn soft" onclick="manualAWB()">Input AWB</button>
       </div>
 
       <label>Nama Driver</label>
@@ -204,14 +283,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
       </div>
 
       <div id="snSection" class="hidden">
-        <div class="sectionCap">FOTO SN (BERULANG – MAKSIMAL 2 FOTO)</div>
+        <div class="sectionCap">FOTO SN (BERULANG – SESUAI JUMLAH AWB)</div>
         <div class="photoBox">
           <button class="btn primary" onclick="document.getElementById('snPhotoInput').click()">📷 AMBIL FOTO SN</button>
           <input id="snPhotoInput" class="hidden" type="file" accept="image/*" capture="environment">
+          <div id="snFileReader" class="hidden"></div>
           <div class="progress" id="ocrProgress"></div>
           <div id="snList"></div>
           <div id="snPreview" class="hidden"></div>
-          <div class="snLimit">Maksimal 2 Foto SN. Jumlah No SN mengikuti jumlah foto.</div>
+          <div class="snLimit" id="snLimitInfo">Maksimal Foto SN = Jumlah AWB (0)</div>
         </div>
       </div>
 
@@ -220,12 +300,25 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
     </div>
   </section>
 
+
+  <div id="awbModalOverlay" class="awbModalOverlay hidden" onclick="awbModalBackdrop(event)">
+    <div class="awbModal" role="dialog" aria-modal="true" aria-labelledby="awbModalTitle">
+      <div id="awbModalTitle" class="awbModalTitle">Input AWB</div>
+      <div class="awbModalHint">Masukkan nomor AWB lalu tekan Simpan.</div>
+      <input id="manualAwbInput" class="awbModalInput" type="text" placeholder="Nomor AWB" autocomplete="off">
+      <div class="awbModalActions">
+        <button type="button" class="awbModalBtn cancel" onclick="closeAwbModal()">Batal</button>
+        <button type="button" class="awbModalBtn save" onclick="submitManualAWB()">Simpan</button>
+      </div>
+    </div>
+  </div>
+
   <div class="footer">H JOEL LOGISTICS · LAST MILE</div>
 </div>
 <script>
 
 // GANTI setelah deploy Apps Script Web App (/exec)
-const API_URL = 'https://script.google.com/macros/s/AKfycbwx52muo2JAdLMH4T4-1v08MjoqgO5xkka2URHoHkUblCEd94LkeXDrOo1UeVO0SDnFfg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwvSTmZkm9CGrEW3kJG8Du_THFSNX0fE49y97wElfXzANkfewhp-LuMtyPqZD8P4DWwCg/exec';
 let cfg={vendor:[],keterangan:[],users:[]}, session=null, moduleName='', awbs=[], snItems=[], driverPhoto='';
 let scanner=null, scanLock=false, driverPhotoStream=null;
 
@@ -240,28 +333,99 @@ function showHome(){$('loginView').classList.add('hidden');$('formView').classLi
 function logout(){localStorage.removeItem('hjoelSession');session=null;$('homeView').classList.add('hidden');$('formView').classList.add('hidden');$('loginView').classList.remove('hidden');$('usernameInput').value=''}
 async function goHome(){await stopScanner();closeDriverCamera();resetForm();showHome()}
 function openModule(m){moduleName=m;resetForm();$('homeView').classList.add('hidden');$('formView').classList.remove('hidden');$('formTitle').textContent=m==='outbound'?'OUTBOUND':m==='bast'?'BAST BACK':'RETURN';$('formHint').textContent=m==='outbound'?'AWB dan Foto SN dapat ditambahkan berulang.':m==='bast'?'AWB dapat di-scan berulang.':'Return hanya menerima 1 AWB.';$('snSection').classList.toggle('hidden',m==='bast');$('returnExtra').classList.toggle('hidden',m!=='return');$('driverPhotoSection').classList.toggle('hidden',m==='return')}
-function resetForm(){awbListCollapsed=false;awbs=[];snItems=[];driverPhoto='';['driverName','plateNo','reason'].forEach(x=>$(x).value='');['vendor','keterangan'].forEach(x=>$(x).selectedIndex=0);$('snPhotoInput').value='';closeDriverCamera();$('driverPreview').innerHTML='';$('btnRetakeDriver').classList.add('hidden');$('btnOpenDriverCamera').classList.remove('hidden');$('snPreview').innerHTML='';$('ocrProgress').textContent='';hideStatus('saveStatus');renderAWB();renderSN();if($('awbList'))$('awbList').classList.remove('hidden');if($('awbToggleBtn'))$('awbToggleBtn').textContent='MINIMIZE⌃'}
+function resetForm(){awbListCollapsed=false;awbs=[];snItems=[];driverPhoto='';['driverName','plateNo','reason'].forEach(x=>$(x).value='');['vendor','keterangan'].forEach(x=>$(x).selectedIndex=0);$('snPhotoInput').value='';closeDriverCamera();$('driverPreview').innerHTML='';$('btnRetakeDriver').classList.add('hidden');$('btnOpenDriverCamera').classList.remove('hidden');$('snPreview').innerHTML='';$('ocrProgress').textContent='';hideStatus('saveStatus');renderAWB();renderSN();if($('awbList'))$('awbList').classList.remove('hidden');if($('awbToggleBtn'))$('awbToggleBtn').textContent='MINIMIZE⌃';enforceSnLimit()}
 function addAWB(v){v=String(v||'').trim();if(!v)return;if(moduleName==='return'&&awbs.length){awbs=[v]}else if(!awbs.includes(v))awbs.push(v);renderAWB();beep()}
-function manualAWB(){const v=prompt(moduleName==='return'?'Masukkan 1 AWB':'Masukkan AWB');if(v)addAWB(v)}
+function manualAWB(){
+  const overlay=$('awbModalOverlay');
+  const input=$('manualAwbInput');
+  if(!overlay||!input)return;
+
+  input.value='';
+  overlay.classList.remove('hidden');
+
+  setTimeout(()=>{
+    input.focus();
+  },80);
+}
+
+function closeAwbModal(){
+  const overlay=$('awbModalOverlay');
+  if(overlay)overlay.classList.add('hidden');
+}
+
+function awbModalBackdrop(event){
+  if(event.target && event.target.id==='awbModalOverlay'){
+    closeAwbModal();
+  }
+}
+
+function submitManualAWB(){
+  const input=$('manualAwbInput');
+  if(!input)return;
+
+  const value=String(input.value||'').trim().toUpperCase();
+
+  if(!value){
+    input.focus();
+    return;
+  }
+
+  if(moduleName==='return' && awbs.length>=1){
+    awbs=[value];
+  }else if(!awbs.includes(value)){
+    awbs.push(value);
+  }
+
+  renderAWB();
+  beep();
+  closeAwbModal();
+}
+
+document.addEventListener('keydown',function(e){
+  const overlay=$('awbModalOverlay');
+  if(!overlay || overlay.classList.contains('hidden'))return;
+
+  if(e.key==='Escape'){
+    closeAwbModal();
+  }
+
+  if(e.key==='Enter'){
+    e.preventDefault();
+    submitManualAWB();
+  }
+});
+
 let awbListCollapsed=false;
 function toggleAWBList(){
   awbListCollapsed=!awbListCollapsed;
   $('awbList').classList.toggle('hidden',awbListCollapsed);
   $('awbToggleBtn').textContent=awbListCollapsed?'LIHAT⌄':'MINIMIZE⌃';
 }
+function enforceSnLimit(){
+  const maxSn=awbs.length;
+  if(snItems.length>maxSn){
+    snItems=snItems.slice(0,maxSn);
+  }
+  const info=$('snLimitInfo');
+  if(info) info.textContent='Maksimal Foto SN = Jumlah AWB ('+maxSn+')';
+}
+
 function renderAWB(){
+  enforceSnLimit();
   $('awbCount').textContent=awbs.length;
   const list=$('awbList');
   if(!awbs.length){
     list.innerHTML='<div class="muted" style="padding:11px">Belum ada AWB.</div>';
+    renderSN();
     return;
   }
   list.innerHTML=awbs.map((x,i)=>`
     <div class="awbRow">
       <div>${i+1}.</div>
       <div>${esc(x)}</div>
-      <button class="awbDelete" type="button" onclick="awbs.splice(${i},1);renderAWB()">×</button>
+      <button class="awbDelete" type="button" onclick="awbs.splice(${i},1);renderAWB();renderSN()">×</button>
     </div>`).join('');
+  renderSN();
 }
 function renderSN(){
   $('snCount') && ($('snCount').textContent=snItems.length);
@@ -353,6 +517,79 @@ function beepDuplicate(){
     o.frequency.value=350;g.gain.value=.12;o.start();o.stop(a.currentTime+.2);
   }catch(e){}
 }
+
+async function readTopBarcodeFromImage(file){
+  /*
+    Prioritas 1: BarcodeDetector bila tersedia.
+    Semua barcode yang terdeteksi diurutkan berdasarkan posisi Y,
+    sehingga barcode paling atas dipilih sebagai No SN.
+  */
+  if('BarcodeDetector' in window){
+    try{
+      const supported=await BarcodeDetector.getSupportedFormats();
+      const wanted=[
+        'code_128','code_39','code_93','codabar',
+        'ean_13','ean_8','itf','upc_a','upc_e'
+      ].filter(x=>supported.includes(x));
+
+      const detector=new BarcodeDetector(
+        wanted.length ? {formats:wanted} : undefined
+      );
+
+      const bitmap=await createImageBitmap(file);
+      const codes=await detector.detect(bitmap);
+      bitmap.close && bitmap.close();
+
+      if(codes && codes.length){
+        codes.sort((a,b)=>{
+          const ay=(a.boundingBox&&a.boundingBox.y)||0;
+          const by=(b.boundingBox&&b.boundingBox.y)||0;
+          return ay-by;
+        });
+
+        const top=String(codes[0].rawValue||'').trim();
+        if(top) return top;
+      }
+    }catch(err){
+      console.warn('BarcodeDetector gagal, lanjut fallback:',err);
+    }
+  }
+
+  /*
+    Prioritas 2: html5-qrcode.
+    Library ini juga dapat membaca barcode 1D seperti CODE_128.
+  */
+  try{
+    const formats=[
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.CODE_93,
+      Html5QrcodeSupportedFormats.CODABAR,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.ITF,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E
+    ].filter(Boolean);
+
+    const reader=new Html5Qrcode(
+      'snFileReader',
+      {formatsToSupport:formats}
+    );
+
+    const result=await reader.scanFile(file,true);
+
+    try{reader.clear()}catch(_){}
+
+    return String(result||'').trim();
+
+  }catch(err){
+    console.warn('html5-qrcode gagal membaca Foto SN:',err);
+  }
+
+  return '';
+}
+
 async function compressFile(file,max=1280,q=.72){const data=await fileToDataURL(file);const img=await loadImg(data);let w=img.width,h=img.height;if(Math.max(w,h)>max){const r=max/Math.max(w,h);w=Math.round(w*r);h=Math.round(h*r)}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);return c.toDataURL('image/jpeg',q)}
 function fileToDataURL(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)})} function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src})}
 async function openDriverCamera(){
@@ -404,18 +641,72 @@ function closeDriverCamera(){
   if(!driverPhoto && $('btnOpenDriverCamera'))$('btnOpenDriverCamera').classList.remove('hidden');
 }
 
-$('snPhotoInput').addEventListener('change',async e=>{if(snItems.length>=2){status('saveStatus','Maksimal 2 Foto SN. Hapus salah satu jika ingin mengganti.','bad');e.target.value='';return;}
+$('snPhotoInput').addEventListener('change',async e=>{
   const f=e.target.files[0];
   if(!f)return;
-  const photo=await compressFile(f);
-  snItems.push({sn:'',photo});
-  renderSN();
-  $('ocrProgress').textContent='Foto SN tersimpan. No SN menyusul.';
+
+  const maxSn=awbs.length;
+
+  if(maxSn===0){
+    status('saveStatus','Scan / input AWB terlebih dahulu sebelum Foto SN.','bad');
+    e.target.value='';
+    return;
+  }
+
+  if(snItems.length>=maxSn){
+    status(
+      'saveStatus',
+      'Jumlah Foto SN sudah mencapai batas sesuai jumlah AWB ('+maxSn+').',
+      'bad'
+    );
+    e.target.value='';
+    return;
+  }
+
+  $('ocrProgress').textContent='Membaca No SN dari barcode paling atas...';
+
+  try{
+    const photo=await compressFile(f);
+    const sn=await readTopBarcodeFromImage(f);
+
+    snItems.push({
+      sn:sn || '',
+      photo:photo
+    });
+
+    renderSN();
+
+    if(sn){
+      $('ocrProgress').textContent=
+        'No SN berhasil terbaca otomatis: '+sn+
+        ' · Foto SN '+snItems.length+'/'+maxSn;
+    }else{
+      $('ocrProgress').textContent=
+        'Foto SN tersimpan, tetapi No SN belum terbaca. Silakan isi No SN manual pada kolom.';
+    }
+
+  }catch(err){
+    console.error(err);
+
+    const photo=await compressFile(f);
+
+    snItems.push({
+      sn:'',
+      photo:photo
+    });
+
+    renderSN();
+
+    $('ocrProgress').textContent=
+      'Foto SN tersimpan, tetapi barcode tidak berhasil dibaca. Silakan isi No SN manual.';
+  }
+
   e.target.value='';
-  if(moduleName==='return'&&snItems.length>1)snItems=snItems.slice(-1);
-  renderSN();
 });
-function validate(){if(!awbs.length)return 'AWB belum di-scan';if(moduleName==='return'&&awbs.length!==1)return 'Return harus 1 AWB';if(!$('driverName').value.trim())return 'Nama Driver wajib diisi';if(!$('plateNo').value.trim())return 'Plat No wajib diisi';if(!$('vendor').value)return 'Vendor wajib dipilih';if(moduleName!=='return'&&!driverPhoto)return 'Foto Driver wajib diambil';if(moduleName==='return'&&!$('keterangan').value)return 'Keterangan wajib dipilih';if(moduleName==='return'&&!$('reason').value.trim())return 'Reason wajib diisi';if((moduleName==='outbound'||moduleName==='return')&&!snItems.length)return 'Foto SN wajib diambil';return ''}
+function validate(){if(!awbs.length)return 'AWB belum di-scan';if(moduleName==='return'&&awbs.length!==1)return 'Return harus 1 AWB';if(!$('driverName').value.trim())return 'Nama Driver wajib diisi';if(!$('plateNo').value.trim())return 'Plat No wajib diisi';if(!$('vendor').value)return 'Vendor wajib dipilih';if(moduleName!=='return'&&!driverPhoto)return 'Foto Driver wajib diambil';if(moduleName==='return'&&!$('keterangan').value)return 'Keterangan wajib dipilih';if(moduleName==='return'&&!$('reason').value.trim())return 'Reason wajib diisi';if((moduleName==='outbound'||moduleName==='return')&&!snItems.length)return 'Foto SN wajib diambil';
+if(snItems.length>awbs.length)return 'Jumlah Foto SN tidak boleh melebihi jumlah AWB';
+if(snItems.some(x=>!String(x.sn||'').trim()))return 'Masih ada No SN yang kosong / belum terbaca';
+return ''}
 async function saveData(){await stopScanner();closeDriverCamera();const v=validate();if(v)return status('saveStatus',v,'bad');const requestId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));const payload={requestId,module:moduleName,username:session.username,origin:session.origin,awbs,driverName:$('driverName').value.trim(),plateNo:$('plateNo').value.trim().toUpperCase(),vendor:$('vendor').value,keterangan:$('keterangan').value,reason:$('reason').value.trim(),driverPhoto,sns:snItems.map(x=>x.sn),snPhotos:snItems.map(x=>x.photo)};$('saveBtn').disabled=true;status('saveStatus','Mengirim data...','wait');try{if(API_URL.includes('PASTE_'))throw new Error('Isi API_URL pada index.html dengan URL Apps Script /exec'); const fd=new URLSearchParams();fd.set('payload',JSON.stringify(payload)); await fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:fd.toString()}); const ok=await waitStatus(requestId);if(!ok.ok)throw new Error(ok.message||'Gagal menyimpan');status('saveStatus',ok.message||'Data tersimpan','ok');setTimeout(()=>goHome(),1200)}catch(e){status('saveStatus',e.message,'bad')}finally{$('saveBtn').disabled=false}}
 async function waitStatus(id){for(let i=0;i<12;i++){await new Promise(r=>setTimeout(r,1000));try{const d=await jsonp({action:'status',requestId:id},5000);if(!d.pending)return d}catch(e){}}throw new Error('Server belum memberi konfirmasi. Cek Apps Script dan Sheet.')}
 
