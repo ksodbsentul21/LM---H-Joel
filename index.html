@@ -10,7 +10,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icon-192.png" />
 <title>Last Mile - H Joel Logistics</title>
-<meta name="app-version" content="wizard-3-step-v2">
+<meta name="app-version" content="wizard-navigation-fix-v3">
 <script src="https://unpkg.com/html5-qrcode"></script>
 <style>
 
@@ -218,9 +218,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
     <div class="card">
       <div class="moduleTitle">PILIH MODUL</div>
       <div class="grid">
-        <button class="module" onclick="openModule('outbound')"><span>⇧</span>OUTBOUND</button>
-        <button class="module" onclick="openModule('bast')"><span>↩</span>BAST BACK</button>
-        <button class="module" onclick="openModule('return')"><span>↩</span>RETURN</button>
+        <button type="button" class="module" onclick="openModule('outbound')"><span>⇧</span>OUTBOUND</button>
+        <button type="button" class="module" onclick="openModule('bast')"><span>↩</span>BAST BACK</button>
+        <button type="button" class="module" onclick="openModule('return')"><span>↩</span>RETURN</button>
       </div>
       <hr style="border:0;border-top:1px solid #eee;margin:20px 0 12px">
       <div class="session">
@@ -374,29 +374,57 @@ let scanner=null, scanLock=false, driverPhotoStream=null, snPhotoStream=null;
 let wizardStep=1;
 
 function showWizardStep(step){
-  if(step===2){
-    if(!$('driverName').value.trim())return status('saveStatus','Nama Driver wajib diisi.','bad');
-    if(!$('plateNo').value.trim())return status('saveStatus','Plat No wajib diisi.','bad');
-    if(!$('vendor').value)return status('saveStatus','Vendor wajib dipilih.','bad');
+  const manual=document.getElementById('stepManual');
+  const awbStep=document.getElementById('stepAwb');
+  const photo=document.getElementById('stepPhoto');
+
+  if(!manual || !awbStep || !photo){
+    alert('Halaman modul belum siap. Silakan refresh aplikasi.');
+    return;
   }
-  if(step===3 && !awbs.length){
-    return status('saveStatus','Scan / Input minimal 1 AWB terlebih dahulu.','bad');
+
+  // Validasi hanya ketika maju.
+  if(step===2 && wizardStep===1){
+    const driver=document.getElementById('driverName');
+    const plate=document.getElementById('plateNo');
+    const vendor=document.getElementById('vendor');
+
+    if(!driver || !driver.value.trim()){
+      status('saveStatus','Nama Driver wajib diisi.','bad');
+      return;
+    }
+    if(!plate || !plate.value.trim()){
+      status('saveStatus','Plat No wajib diisi.','bad');
+      return;
+    }
+    if(!vendor || !vendor.value){
+      status('saveStatus','Vendor wajib dipilih.','bad');
+      return;
+    }
+  }
+
+  if(step===3 && wizardStep===2 && awbs.length===0){
+    status('saveStatus','Scan / Input minimal 1 AWB terlebih dahulu.','bad');
+    return;
   }
 
   wizardStep=step;
-  $('stepManual').classList.toggle('active',step===1);
-  $('stepAwb').classList.toggle('active',step===2);
-  $('stepPhoto').classList.toggle('active',step===3);
-  $('stepManual').style.display=step===1?'block':'none';
-  $('stepAwb').style.display=step===2?'block':'none';
-  $('stepPhoto').style.display=step===3?'block':'none';
 
-  document.querySelectorAll('[data-dot]').forEach((d,i)=>{
-    d.classList.toggle('active',(i+1)<=step);
+  manual.style.display=step===1?'block':'none';
+  awbStep.style.display=step===2?'block':'none';
+  photo.style.display=step===3?'block':'none';
+
+  manual.classList.toggle('active',step===1);
+  awbStep.classList.toggle('active',step===2);
+  photo.classList.toggle('active',step===3);
+
+  document.querySelectorAll('[data-dot]').forEach((dot,i)=>{
+    dot.classList.toggle('active',(i+1)<=step);
   });
+
+  hideStatus('saveStatus');
   window.scrollTo({top:0,behavior:'smooth'});
 }
-
 
 const $=id=>document.getElementById(id);
 
@@ -416,6 +444,15 @@ function hideStatus(id){
 }
 
 
+
+window.addEventListener('error',function(e){
+  console.error('H JOEL JS ERROR:',e.error||e.message);
+  const el=document.getElementById('loginStatus') || document.getElementById('saveStatus');
+  if(el && !document.getElementById('loginView').classList.contains('hidden')){
+    status('loginStatus','Terjadi error aplikasi. Refresh halaman lalu coba lagi.','bad');
+  }
+});
+
 function jsonp(params,timeout=12000){return new Promise((resolve,reject)=>{if(API_URL.includes('PASTE_')) return reject(new Error('API_URL belum diisi di index.html')); const cb='cb_'+Date.now()+'_'+Math.random().toString(36).slice(2); const s=document.createElement('script'); const t=setTimeout(()=>{cleanup();reject(new Error('Timeout ke server'))},timeout); function cleanup(){clearTimeout(t);delete window[cb];s.remove()} window[cb]=d=>{cleanup();resolve(d)}; s.onerror=()=>{cleanup();reject(new Error('Gagal terhubung ke Apps Script'))}; const q=new URLSearchParams({...params,callback:cb,_:Date.now()}); s.src=API_URL+'?'+q; document.head.appendChild(s);})}
 async function loadConfig(){try{const d=await jsonp({action:'config'});if(!d.ok)throw new Error(d.message);cfg=d;fillSelect('vendor',d.vendor);fillSelect('keterangan',d.keterangan)}catch(e){status('loginStatus',e.message,'bad')}}
 function fillSelect(id,arr){const el=$(id),first=el.options[0]?.outerHTML||'<option value="">Pilih</option>';el.innerHTML=first;arr.forEach(v=>{const o=document.createElement('option');o.value=o.textContent=v;el.appendChild(o)})}
@@ -423,8 +460,81 @@ async function login(){hideStatus('loginStatus');const u=$('usernameInput').valu
 function showHome(){$('loginView').classList.add('hidden');$('formView').classList.add('hidden');$('homeView').classList.remove('hidden');$('sessUser').textContent=session.username;$('sessOrigin').textContent=session.origin}
 function logout(){localStorage.removeItem('hjoelSession');session=null;$('homeView').classList.add('hidden');$('formView').classList.add('hidden');$('loginView').classList.remove('hidden');$('usernameInput').value=''}
 async function goHome(){await stopScanner();closeDriverCamera();closeSnCamera();resetForm();showHome()}
-function openModule(m){moduleName=m;resetForm();setTimeout(()=>showWizardStep(1),0);$('homeView').classList.add('hidden');$('formView').classList.remove('hidden');$('formTitle').textContent=m==='outbound'?'OUTBOUND':m==='bast'?'BAST BACK':'RETURN';$('formHint').textContent=m==='outbound'?'AWB dan Foto SN dapat ditambahkan berulang.':m==='bast'?'AWB dapat di-scan berulang.':'Return hanya menerima 1 AWB.';$('snSection').classList.toggle('hidden',m==='bast');$('returnExtra').classList.toggle('hidden',m!=='return');$('driverPhotoSection').classList.toggle('hidden',m==='return')}
-function resetForm(){closeSnCamera();awbListCollapsed=false;awbs=[];snItems=[];driverPhoto='';['driverName','plateNo','reason'].forEach(x=>$(x).value='');['vendor','keterangan'].forEach(x=>$(x).selectedIndex=0);closeDriverCamera();$('driverPreview').innerHTML='';$('btnRetakeDriver').classList.add('hidden');$('btnOpenDriverCamera').classList.remove('hidden');$('snPreview').innerHTML='';$('ocrProgress').textContent='';hideStatus('saveStatus');renderAWB();renderSN();if($('awbList'))$('awbList').classList.remove('hidden');if($('awbToggleBtn'))$('awbToggleBtn').textContent='MINIMIZE⌃';enforceSnLimit()}
+function openModule(m){
+  moduleName=m;
+
+  // Tampilkan form lebih dulu, baru reset dan tentukan tahap.
+  $('homeView').classList.add('hidden');
+  $('formView').classList.remove('hidden');
+
+  $('formTitle').textContent=
+    m==='outbound'?'OUTBOUND':
+    m==='bast'?'BAST BACK':'RETURN';
+
+  $('formHint').textContent=
+    m==='outbound'?'Lengkapi data, scan AWB, lalu foto.':
+    m==='bast'?'Lengkapi data, scan AWB, lalu foto.':
+    'Lengkapi data Return, scan 1 AWB, lalu foto.';
+
+  $('snSection').classList.toggle('hidden',m==='bast');
+  $('returnExtra').classList.toggle('hidden',m!=='return');
+  $('driverPhotoSection').classList.toggle('hidden',m==='return');
+
+  resetForm();
+  wizardStep=1;
+  showWizardStep(1);
+}
+
+function resetForm(){
+  try{closeSnCamera()}catch(_){}
+  try{closeDriverCamera()}catch(_){}
+
+  awbs=[];
+  snItems=[];
+  driverPhoto='';
+  scanLock=false;
+
+  const driver=$('driverName');
+  const plate=$('plateNo');
+  const reason=$('reason');
+  if(driver)driver.value='';
+  if(plate)plate.value='';
+  if(reason)reason.value='';
+
+  const vendor=$('vendor');
+  const ket=$('keterangan');
+  if(vendor)vendor.selectedIndex=0;
+  if(ket)ket.selectedIndex=0;
+
+  const preview=$('driverPreview');
+  if(preview)preview.innerHTML='';
+
+  const retake=$('btnRetakeDriver');
+  if(retake)retake.classList.add('hidden');
+
+  const openDriver=$('btnOpenDriverCamera');
+  if(openDriver)openDriver.classList.remove('hidden');
+
+  const snPreview=$('snPreview');
+  if(snPreview)snPreview.innerHTML='';
+
+  const prog=$('ocrProgress');
+  if(prog)prog.textContent='';
+
+  hideStatus('saveStatus');
+
+  try{renderAWB()}catch(e){console.error('renderAWB',e)}
+  try{renderSN()}catch(e){console.error('renderSN',e)}
+
+  const list=$('awbList');
+  if(list)list.classList.remove('hidden');
+
+  const toggle=$('awbToggleBtn');
+  if(toggle)toggle.textContent='MINIMIZE⌃';
+
+  awbListCollapsed=false;
+  try{enforceSnLimit()}catch(e){console.error('enforceSnLimit',e)}
+}
 function addAWB(v){
   v=String(v||'').trim().toUpperCase();
   if(!v)return;
@@ -588,7 +698,7 @@ async function scanAWB(){
           addAWB(awb);
         }else{
           beepDuplicate();
-          status('saveStatus','AWB sudah pernah discan: '+awb,'bad');
+          logDoubleScan(awb);
         }
         setTimeout(()=>scanLock=false,900);
       },
