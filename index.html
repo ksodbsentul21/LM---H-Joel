@@ -11,6 +11,7 @@
 <link rel="apple-touch-icon" href="icon-192.png" />
 <title>Last Mile - H Joel Logistics</title>
 <script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 
 :root{
@@ -326,7 +327,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 <script>
 
 // GANTI setelah deploy Apps Script Web App (/exec)
-const API_URL = 'https://script.google.com/macros/s/AKfycbwx52muo2JAdLMH4T4-1v08MjoqgO5xkka2URHoHkUblCEd94LkeXDrOo1UeVO0SDnFfg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwvSTmZkm9CGrEW3kJG8Du_THFSNX0fE49y97wElfXzANkfewhp-LuMtyPqZD8P4DWwCg/exec';
 let cfg={vendor:[],keterangan:[],users:[]}, session=null, moduleName='', awbs=[], snItems=[], driverPhoto='';
 let scanner=null, scanLock=false, driverPhotoStream=null, snPhotoStream=null, driverPhotoUrl='', uploadBusy=0;
 
@@ -627,7 +628,7 @@ async function captureSnPhoto(){
   const photo=canvas.toDataURL('image/jpeg',.72);
 
   $('ocrProgress').textContent=
-    'Membaca No SN dari barcode paling atas...';
+    'Membaca No SN dari bagian atas foto...';
 
   let sn='';
 
@@ -710,141 +711,109 @@ function closeSnCamera(){
 
 
 async function readTopBarcodeFromCanvas(canvas){
-  /*
-    FOTO YANG DISIMPAN TETAP FULL.
-    Untuk membaca No SN, sistem hanya memproses bagian ATAS foto
-    agar barcode bawah (EAN/produk) tidak ikut terbaca.
-  */
-
   const crop=document.createElement('canvas');
   const ctx=crop.getContext('2d');
-
-  // Ambil sekitar 40% bagian atas foto.
-  // Ini cukup untuk area barcode SN pada label contoh Hisense.
-  const cropHeight=Math.max(
-    160,
-    Math.floor(canvas.height*0.40)
-  );
-
+  const cropHeight=Math.max(180,Math.floor(canvas.height*0.42));
   crop.width=canvas.width;
   crop.height=Math.min(cropHeight,canvas.height);
+  ctx.drawImage(canvas,0,0,canvas.width,crop.height,0,0,crop.width,crop.height);
 
-  ctx.drawImage(
-    canvas,
-    0,0,
-    canvas.width,crop.height,
-    0,0,
-    crop.width,crop.height
-  );
-
-  /*
-    Prioritas 1: BarcodeDetector
-  */
   if('BarcodeDetector' in window){
     try{
       const supported=await BarcodeDetector.getSupportedFormats();
-
-      const wanted=[
-        'code_128',
-        'code_39',
-        'code_93',
-        'codabar',
-        'ean_13',
-        'ean_8',
-        'itf',
-        'upc_a',
-        'upc_e'
-      ].filter(format=>supported.includes(format));
-
-      const detector=new BarcodeDetector(
-        wanted.length ? {formats:wanted} : undefined
-      );
-
+      const wanted=['code_128','code_39','code_93','codabar','ean_13','ean_8','itf','upc_a','upc_e']
+        .filter(f=>supported.includes(f));
+      const detector=new BarcodeDetector(wanted.length?{formats:wanted}:undefined);
       const codes=await detector.detect(crop);
+      if(codes&&codes.length){
+        codes.sort((a,b)=>((a.boundingBox&&a.boundingBox.y)||0)-((b.boundingBox&&b.boundingBox.y)||0));
+        const top=normalizeSnValue(String(codes[0].rawValue||''));
+        if(isLikelySn(top)) return top;
+      }
+    }catch(e){console.warn('BarcodeDetector gagal:',e);}
+  }
 
-      if(codes && codes.length){
-        /*
-          Jika ada lebih dari satu barcode di area atas,
-          tetap prioritaskan yang paling atas.
-        */
-        codes.sort((a,b)=>{
-          const ay=(a.boundingBox&&a.boundingBox.y)||0;
-          const by=(b.boundingBox&&b.boundingBox.y)||0;
-          return ay-by;
-        });
+  try{
+    const blob=await new Promise(resolve=>crop.toBlob(resolve,'image/jpeg',.96));
+    if(blob){
+      const file=new File([blob],'sn-top.jpg',{type:'image/jpeg'});
+      let temp=$('snFileReaderDynamic');
+      if(!temp){
+        temp=document.createElement('div');
+        temp.id='snFileReaderDynamic';
+        temp.className='hidden';
+        document.body.appendChild(temp);
+      }
+      const formats=[
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.CODABAR,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E
+      ].filter(Boolean);
+      const qr=new Html5Qrcode('snFileReaderDynamic',{formatsToSupport:formats});
+      const result=await qr.scanFile(file,true);
+      try{qr.clear()}catch(_){}
+      const scanned=normalizeSnValue(String(result||''));
+      if(isLikelySn(scanned)) return scanned;
+    }
+  }catch(e){console.warn('html5-qrcode gagal:',e);}
 
-        const top=String(codes[0].rawValue||'').trim();
-
-        if(top){
-          return top;
+  try{
+    const ocrCanvas=prepareSnOcrCanvas(crop);
+    $('ocrProgress').textContent='Barcode belum terbaca. Mencoba membaca teks SN...';
+    const result=await Tesseract.recognize(ocrCanvas,'eng',{
+      logger:m=>{
+        if(m&&m.status==='recognizing text'){
+          $('ocrProgress').textContent='Membaca teks SN... '+Math.round((m.progress||0)*100)+'%';
         }
       }
-    }catch(e){
-      console.warn('BarcodeDetector gagal:',e);
-    }
-  }
-
-  /*
-    Prioritas 2: html5-qrcode
-    Yang discan juga hanya hasil crop bagian atas,
-    BUKAN foto full.
-  */
-  try{
-    const blob=await new Promise(resolve=>{
-      crop.toBlob(resolve,'image/jpeg',.95);
     });
-
-    if(!blob){
-      return '';
-    }
-
-    const file=new File(
-      [blob],
-      'sn-top.jpg',
-      {type:'image/jpeg'}
-    );
-
-    let temp=$('snFileReaderDynamic');
-
-    if(!temp){
-      temp=document.createElement('div');
-      temp.id='snFileReaderDynamic';
-      temp.className='hidden';
-      document.body.appendChild(temp);
-    }
-
-    const formats=[
-      Html5QrcodeSupportedFormats.CODE_128,
-      Html5QrcodeSupportedFormats.CODE_39,
-      Html5QrcodeSupportedFormats.CODE_93,
-      Html5QrcodeSupportedFormats.CODABAR,
-      Html5QrcodeSupportedFormats.EAN_13,
-      Html5QrcodeSupportedFormats.EAN_8,
-      Html5QrcodeSupportedFormats.ITF,
-      Html5QrcodeSupportedFormats.UPC_A,
-      Html5QrcodeSupportedFormats.UPC_E
-    ].filter(Boolean);
-
-    const qr=new Html5Qrcode(
-      'snFileReaderDynamic',
-      {formatsToSupport:formats}
-    );
-
-    const result=await qr.scanFile(file,true);
-
-    try{
-      qr.clear();
-    }catch(_){}
-
-    return String(result||'').trim();
-
-  }catch(e){
-    console.warn('Fallback html5-qrcode gagal:',e);
-  }
+    const raw=(result&&result.data&&result.data.text)?result.data.text:'';
+    const sn=extractSnFromOcrText(raw);
+    if(sn) return sn;
+  }catch(e){console.warn('OCR SN gagal:',e);}
 
   return '';
 }
 
+function prepareSnOcrCanvas(source){
+  const scale=2,c=document.createElement('canvas');
+  c.width=source.width*scale;c.height=source.height*scale;
+  const ctx=c.getContext('2d');
+  ctx.drawImage(source,0,0,source.width,source.height,0,0,c.width,c.height);
+  const img=ctx.getImageData(0,0,c.width,c.height),d=img.data;
+  for(let i=0;i<d.length;i+=4){
+    const g=Math.round(d[i]*.299+d[i+1]*.587+d[i+2]*.114);
+    const v=g>155?255:(g<90?0:Math.max(0,Math.min(255,(g-128)*1.7+128)));
+    d[i]=d[i+1]=d[i+2]=v;
+  }
+  ctx.putImageData(img,0,0);
+  return c;
+}
+
+function normalizeSnValue(v){
+  return String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'').trim();
+}
+
+function isLikelySn(v){
+  v=normalizeSnValue(v);
+  return v.length>=12&&v.length<=40&&/[A-Z]/.test(v)&&/\d/.test(v);
+}
+
+function extractSnFromOcrText(text){
+  const lines=String(text||'').toUpperCase().split(/\r?\n/)
+    .map(x=>x.replace(/[^A-Z0-9]/g,'').trim()).filter(Boolean);
+  for(const line of lines){if(isLikelySn(line))return line;}
+  const joined=normalizeSnValue(text);
+  const matches=joined.match(/[A-Z0-9]{12,40}/g)||[];
+  for(const m of matches){if(isLikelySn(m))return m;}
+  return '';
+}
 
 function successSnBeep(){
   try{
