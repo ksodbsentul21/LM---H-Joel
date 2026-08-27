@@ -326,9 +326,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 <script>
 
 // GANTI setelah deploy Apps Script Web App (/exec)
-const API_URL = 'https://script.google.com/macros/s/AKfycbwx52muo2JAdLMH4T4-1v08MjoqgO5xkka2URHoHkUblCEd94LkeXDrOo1UeVO0SDnFfg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwvSTmZkm9CGrEW3kJG8Du_THFSNX0fE49y97wElfXzANkfewhp-LuMtyPqZD8P4DWwCg/exec';
 let cfg={vendor:[],keterangan:[],users:[]}, session=null, moduleName='', awbs=[], snItems=[], driverPhoto='';
-let scanner=null, scanLock=false, driverPhotoStream=null, snPhotoStream=null, driverPhotoUrl='', uploadBusy=0;
+let scanner=null, scanLock=false, driverPhotoStream=null, snPhotoStream=null;
 
 const $=id=>document.getElementById(id);
 function status(id,msg,type='wait'){const el=$(id);el.className='status show '+type;el.textContent=msg}
@@ -341,7 +341,7 @@ function showHome(){$('loginView').classList.add('hidden');$('formView').classLi
 function logout(){localStorage.removeItem('hjoelSession');session=null;$('homeView').classList.add('hidden');$('formView').classList.add('hidden');$('loginView').classList.remove('hidden');$('usernameInput').value=''}
 async function goHome(){await stopScanner();closeDriverCamera();closeSnCamera();resetForm();showHome()}
 function openModule(m){moduleName=m;resetForm();$('homeView').classList.add('hidden');$('formView').classList.remove('hidden');$('formTitle').textContent=m==='outbound'?'OUTBOUND':m==='bast'?'BAST BACK':'RETURN';$('formHint').textContent=m==='outbound'?'AWB dan Foto SN dapat ditambahkan berulang.':m==='bast'?'AWB dapat di-scan berulang.':'Return hanya menerima 1 AWB.';$('snSection').classList.toggle('hidden',m==='bast');$('returnExtra').classList.toggle('hidden',m!=='return');$('driverPhotoSection').classList.toggle('hidden',m==='return')}
-function resetForm(){closeSnCamera();awbListCollapsed=false;awbs=[];snItems=[];driverPhoto='';driverPhotoUrl='';['driverName','plateNo','reason'].forEach(x=>$(x).value='');['vendor','keterangan'].forEach(x=>$(x).selectedIndex=0);closeDriverCamera();$('driverPreview').innerHTML='';$('btnRetakeDriver').classList.add('hidden');$('btnOpenDriverCamera').classList.remove('hidden');$('snPreview').innerHTML='';$('ocrProgress').textContent='';hideStatus('saveStatus');renderAWB();renderSN();if($('awbList'))$('awbList').classList.remove('hidden');if($('awbToggleBtn'))$('awbToggleBtn').textContent='MINIMIZE⌃';enforceSnLimit()}
+function resetForm(){closeSnCamera();awbListCollapsed=false;awbs=[];snItems=[];driverPhoto='';['driverName','plateNo','reason'].forEach(x=>$(x).value='');['vendor','keterangan'].forEach(x=>$(x).selectedIndex=0);closeDriverCamera();$('driverPreview').innerHTML='';$('btnRetakeDriver').classList.add('hidden');$('btnOpenDriverCamera').classList.remove('hidden');$('snPreview').innerHTML='';$('ocrProgress').textContent='';hideStatus('saveStatus');renderAWB();renderSN();if($('awbList'))$('awbList').classList.remove('hidden');if($('awbToggleBtn'))$('awbToggleBtn').textContent='MINIMIZE⌃';enforceSnLimit()}
 function addAWB(v){v=String(v||'').trim();if(!v)return;if(moduleName==='return'&&awbs.length){awbs=[v]}else if(!awbs.includes(v))awbs.push(v);renderAWB();beep()}
 function manualAWB(){
   const overlay=$('awbModalOverlay');
@@ -448,7 +448,7 @@ function renderSN(){
       <img src="${x.photo}" alt="Foto SN ${i+1}">
       <div class="snInputWrap">
         <label>Foto SN ${i+1}</label>
-        <div class="muted">${x.url?'Foto berhasil diupload':'Foto belum selesai diupload'}</div>
+        <div class="muted">Siap disimpan</div>
       </div>
       <button class="snRemove" type="button" onclick="removeSN(${i})">×</button>
     </div>`).join('');
@@ -612,9 +612,11 @@ async function captureSnPhoto(){
   let width=video.videoWidth;
   let height=video.videoHeight;
 
-  if(width>1280){
-    height=Math.round(height*1280/width);
-    width=1280;
+  const maxSn=1280;
+  if(Math.max(width,height)>maxSn){
+    const r=maxSn/Math.max(width,height);
+    width=Math.round(width*r);
+    height=Math.round(height*r);
   }
 
   canvas.width=width;
@@ -624,25 +626,10 @@ async function captureSnPhoto(){
     .getContext('2d')
     .drawImage(video,0,0,width,height);
 
-  const photo=canvas.toDataURL('image/jpeg',.72);
-
-  $('ocrProgress').textContent='Mengupload Foto SN...';
-
-  let uploadedUrl='';
-
-  try{
-    uploadBusy++;
-    const up=await uploadPhotoNow(photo,'sn');
-    uploadedUrl=up.url||'';
-  }catch(e){
-    console.warn('Upload Foto SN gagal:',e);
-  }finally{
-    uploadBusy=Math.max(0,uploadBusy-1);
-  }
+  const photo=canvas.toDataURL('image/jpeg',.65);
 
   snItems.push({
-    photo:photo,
-    url:uploadedUrl
+    photo:photo
   });
 
   renderSN();
@@ -656,10 +643,8 @@ async function captureSnPhoto(){
   const max=awbs.length;
 
   $('ocrProgress').textContent=
-    'Foto SN '+taken+'/'+max+
-    (uploadedUrl?' berhasil diupload.':' tersimpan sementara, upload belum berhasil.');
+    'Foto SN '+taken+'/'+max+' siap disimpan.';
 
-  // Kamera tetap aktif agar bisa foto SN berikutnya.
   if(taken>=max){
     closeSnCamera();
     status(
@@ -749,26 +734,25 @@ async function captureDriverPhoto(){
   }
   const c=document.createElement('canvas');
   let w=video.videoWidth,h=video.videoHeight;
-  if(w>1280){h=Math.round(h*1280/w);w=1280}
-  c.width=w;c.height=h;
+
+  const maxDriver=960;
+  if(Math.max(w,h)>maxDriver){
+    const r=maxDriver/Math.max(w,h);
+    w=Math.round(w*r);
+    h=Math.round(h*r);
+  }
+
+  c.width=w;
+  c.height=h;
   c.getContext('2d').drawImage(video,0,0,w,h);
-  driverPhoto=c.toDataURL('image/jpeg',.72);
-  driverPhotoUrl='';
+
+  // Foto Driver dikompres agar upload lebih cepat.
+  driverPhoto=c.toDataURL('image/jpeg',.60);
   $('driverPreview').innerHTML=`<div class="thumb"><img src="${driverPhoto}"></div>`;
   closeDriverCamera();
   $('btnRetakeDriver').classList.remove('hidden');
   $('btnOpenDriverCamera').classList.add('hidden');
-  status('saveStatus','Foto Driver berhasil diambil. Mengupload foto...','wait');
-  try{
-    uploadBusy++;
-    const up=await uploadPhotoNow(driverPhoto,'driver');
-    driverPhotoUrl=up.url||'';
-    status('saveStatus','Foto Driver berhasil diupload.','ok');
-  }catch(e){
-    status('saveStatus','Upload Foto Driver gagal: '+e.message,'bad');
-  }finally{
-    uploadBusy=Math.max(0,uploadBusy-1);
-  }
+  status('saveStatus','Foto Driver berhasil diambil.','ok');
 }
 
 function closeDriverCamera(){
@@ -783,57 +767,11 @@ function closeDriverCamera(){
 }
 
 
-function validate(){if(!awbs.length)return 'AWB belum di-scan';if(moduleName==='return'&&awbs.length!==1)return 'Return harus 1 AWB';if(!$('driverName').value.trim())return 'Nama Driver wajib diisi';if(!$('plateNo').value.trim())return 'Plat No wajib diisi';if(!$('vendor').value)return 'Vendor wajib dipilih';if(moduleName!=='return'&&!driverPhoto)return 'Foto Driver wajib diambil';if(moduleName==='return'&&!$('keterangan').value)return 'Keterangan wajib dipilih';if(moduleName==='return'&&!$('reason').value.trim())return 'Reason wajib diisi';if(uploadBusy>0)return 'Masih ada foto yang sedang diupload. Tunggu beberapa detik lalu simpan lagi.';
-if((moduleName==='outbound'||moduleName==='return')&&!snItems.length)return 'Foto SN wajib diambil';
+function validate(){if(!awbs.length)return 'AWB belum di-scan';if(moduleName==='return'&&awbs.length!==1)return 'Return harus 1 AWB';if(!$('driverName').value.trim())return 'Nama Driver wajib diisi';if(!$('plateNo').value.trim())return 'Plat No wajib diisi';if(!$('vendor').value)return 'Vendor wajib dipilih';if(moduleName!=='return'&&!driverPhoto)return 'Foto Driver wajib diambil';if(moduleName==='return'&&!$('keterangan').value)return 'Keterangan wajib dipilih';if(moduleName==='return'&&!$('reason').value.trim())return 'Reason wajib diisi';if((moduleName==='outbound'||moduleName==='return')&&!snItems.length)return 'Foto SN wajib diambil';
 if(snItems.length>awbs.length)return 'Jumlah Foto SN tidak boleh melebihi jumlah AWB';
 return ''}
 
-async function uploadPhotoNow(dataUrl,type){
-  if(!dataUrl)throw new Error('Foto kosong');
-
-  const requestId=
-    (crypto.randomUUID
-      ? crypto.randomUUID()
-      : Date.now()+'-'+Math.random().toString(36).slice(2));
-
-  const payload={
-    action:'uploadPhoto',
-    requestId:requestId,
-    type:type,
-    username:session?session.username:'',
-    origin:session?session.origin:'',
-    module:moduleName||'',
-    dataUrl:dataUrl
-  };
-
-  const fd=new URLSearchParams();
-  fd.set('payload',JSON.stringify(payload));
-
-  // Apps Script Web App sering melakukan redirect/CORS pada POST.
-  // Karena itu upload dikirim no-cors, lalu hasilnya dicek
-  // melalui endpoint status menggunakan requestId.
-  await fetch(
-    API_URL,
-    {
-      method:'POST',
-      mode:'no-cors',
-      headers:{
-        'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'
-      },
-      body:fd.toString()
-    }
-  );
-
-  const result=await waitStatus(requestId);
-
-  if(!result.ok){
-    throw new Error(result.message||'Upload foto gagal');
-  }
-
-  return result;
-}
-
-async function saveData(){await stopScanner();closeDriverCamera();closeSnCamera();const v=validate();if(v)return status('saveStatus',v,'bad');const requestId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));const payload={requestId,module:moduleName,username:session.username,origin:session.origin,awbs,driverName:$('driverName').value.trim(),plateNo:$('plateNo').value.trim().toUpperCase(),vendor:$('vendor').value,keterangan:$('keterangan').value,reason:$('reason').value.trim(),driverPhotoUrl,sns:snItems.map(()=>''),snPhotoUrls:snItems.map(x=>x.url||'')};$('saveBtn').disabled=true;status('saveStatus','Mengirim data...','wait');try{if(API_URL.includes('PASTE_'))throw new Error('Isi API_URL pada index.html dengan URL Apps Script /exec'); const fd=new URLSearchParams();fd.set('payload',JSON.stringify(payload)); await fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:fd.toString()}); const ok=await waitStatus(requestId);if(!ok.ok)throw new Error(ok.message||'Gagal menyimpan');status('saveStatus',ok.message||'Data tersimpan','ok');setTimeout(()=>goHome(),1200)}catch(e){status('saveStatus',e.message,'bad')}finally{$('saveBtn').disabled=false}}
+async function saveData(){await stopScanner();closeDriverCamera();closeSnCamera();const v=validate();if(v)return status('saveStatus',v,'bad');const requestId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));const payload={requestId,module:moduleName,username:session.username,origin:session.origin,awbs,driverName:$('driverName').value.trim(),plateNo:$('plateNo').value.trim().toUpperCase(),vendor:$('vendor').value,keterangan:$('keterangan').value,reason:$('reason').value.trim(),driverPhoto,sns:snItems.map(()=>''),snPhotos:snItems.map(x=>x.photo)};$('saveBtn').disabled=true;status('saveStatus','Mengupload foto dan menyimpan data...','wait');try{if(API_URL.includes('PASTE_'))throw new Error('Isi API_URL pada index.html dengan URL Apps Script /exec'); const fd=new URLSearchParams();fd.set('payload',JSON.stringify(payload)); await fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:fd.toString()}); const ok=await waitStatus(requestId);if(!ok.ok)throw new Error(ok.message||'Gagal menyimpan');status('saveStatus',ok.message||'Data tersimpan','ok');setTimeout(()=>goHome(),1200)}catch(e){status('saveStatus',e.message,'bad')}finally{$('saveBtn').disabled=false}}
 async function waitStatus(id){
   for(let i=0;i<30;i++){
     await new Promise(r=>setTimeout(r,1000));
