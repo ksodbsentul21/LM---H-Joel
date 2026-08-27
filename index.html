@@ -11,104 +11,221 @@
 <link rel="apple-touch-icon" href="icon-192.png" />
 <title>Last Mile - H Joel Logistics</title>
 <script src="https://unpkg.com/html5-qrcode"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
-:root{--o:#f57c00;--d:#24282c;--bg:#f4f6f8;--mut:#667085;--ok:#16835b;--bad:#c62828;--card:#fff;--line:#e5e7eb}
-*{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--d)}
-.app{max-width:720px;margin:auto;min-height:100vh;padding:env(safe-area-inset-top) 14px calc(24px + env(safe-area-inset-bottom))}
-.brand{background:#fff;border-radius:0 0 20px 20px;box-shadow:0 5px 24px #00000010;padding:14px;text-align:center;position:sticky;top:0;z-index:10}.brand img{max-width:315px;width:88%;height:auto}.sub{font-size:12px;color:var(--mut);font-weight:700;letter-spacing:.12em;margin-top:4px}
-.card{background:var(--card);border-radius:18px;padding:18px;margin-top:14px;box-shadow:0 5px 22px #1118270c;border:1px solid #eef0f2}.hidden{display:none!important}
-h1{font-size:22px;margin:0 0 6px}.muted{color:var(--mut);font-size:13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.module{border:0;border-radius:18px;padding:20px 10px;font-size:16px;font-weight:800;background:white;box-shadow:0 4px 18px #0001;min-height:110px}.module span{display:block;font-size:30px;margin-bottom:8px}.module:active,.btn:active{transform:scale(.98)}
-label{font-size:13px;font-weight:800;display:block;margin:14px 0 7px}input,select,textarea{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:16px;outline:none}input:focus,select:focus,textarea:focus{border-color:var(--o);box-shadow:0 0 0 3px #f57c0020}textarea{min-height:80px;resize:vertical}
-.btn{width:100%;border:0;border-radius:13px;padding:14px;font-size:15px;font-weight:800;cursor:pointer}.primary{background:var(--o);color:#fff}.dark{background:var(--d);color:white}.soft{background:#fff3e7;color:#a64f00}.danger{background:#fff0f0;color:var(--bad)}.row{display:flex;gap:9px}.row>*{flex:1}.topline{display:flex;align-items:center;justify-content:space-between;gap:10px}.badge{background:#fff3e7;color:#a64f00;border-radius:999px;padding:7px 10px;font-size:12px;font-weight:800}.list{margin-top:9px;display:flex;flex-wrap:wrap;gap:7px}.chip{background:#f2f4f7;border-radius:999px;padding:7px 10px;font-size:12px;display:flex;gap:7px;align-items:center}.chip button{border:0;background:transparent;color:#c62828;font-weight:900}.count{font-weight:800;color:var(--o)}
-.photoBox{border:1.5px dashed #f2a45a;border-radius:14px;padding:12px;background:#fffaf5}.thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:9px}.thumb{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:#eee}.thumb img{width:100%;height:100%;object-fit:cover}.thumb button{position:absolute;right:4px;top:4px;width:25px;height:25px;border-radius:50%;border:0;background:#0009;color:white}.status{margin-top:12px;padding:12px;border-radius:12px;font-size:13px;display:none}.status.show{display:block}.status.ok{background:#eaf8f2;color:#106846}.status.bad{background:#fff0f0;color:#a51f1f}.status.wait{background:#fff7e8;color:#8a5700}
-#scanner{position:fixed;inset:0;background:#000d;z-index:50;padding:20px;display:flex;flex-direction:column;justify-content:center}.scanbox{background:#111;border-radius:18px;overflow:hidden;max-width:640px;width:100%;margin:auto;padding:12px}.scanbox video{width:100%;max-height:68vh;border-radius:12px}.scanActions{display:flex;gap:8px;margin-top:10px}.scanActions button{flex:1}.session{font-size:13px}.logout{border:0;background:transparent;color:#c62828;font-weight:800}.install{margin-top:10px;font-size:12px;color:var(--mut);line-height:1.5}.progress{font-size:12px;color:var(--mut);margin-top:8px}.footer{text-align:center;color:#98a2b3;font-size:11px;margin:18px 0}
-@media(max-width:420px){.grid{grid-template-columns:1fr}.module{min-height:82px}.brand img{width:95%}}
 
-/* Scanner & kamera langsung - mengikuti perilaku HTML referensi */
+:root{
+  --orange:#ff6500;
+  --orange-soft:#fff4eb;
+  --dark:#202326;
+  --green:#07943f;
+  --bg:#f5f5f5;
+  --muted:#6d7278;
+  --line:#e5e5e5;
+  --danger:#e62828;
+  --white:#fff;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);font-family:Arial,Helvetica,sans-serif;color:var(--dark)}
+body{min-height:100vh}
+.app{max-width:520px;min-height:100vh;margin:auto;background:#fff;padding-bottom:26px}
+.brand{padding:22px 22px 12px;text-align:center;background:#fff}
+.brand img{width:100%;max-width:310px;height:auto;display:block;margin:auto}
+.sub{font-size:13px;letter-spacing:.34em;font-weight:700;margin-top:7px;color:#222}
+.card{margin:14px 18px 0;padding:18px;background:#fff;border:1px solid #eee;border-radius:16px;box-shadow:0 3px 13px rgba(0,0,0,.05)}
+.hidden{display:none!important}
+h1{margin:0 0 8px;font-size:20px;text-align:center}
+.muted{font-size:12px;color:var(--muted);line-height:1.45}
+label{display:block;margin:14px 0 6px;font-size:13px;font-weight:700}
+input,select,textarea{
+  width:100%;min-height:48px;padding:12px 13px;border:1px solid #ddd;border-radius:9px;
+  background:#fff;font-size:15px;outline:none
+}
+textarea{min-height:76px;resize:vertical}
+input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,101,0,.12)}
+.btn{width:100%;min-height:49px;border:0;border-radius:8px;padding:11px 13px;font-size:15px;font-weight:800;cursor:pointer}
+.btn:active,.module:active{transform:scale(.99)}
+.primary{background:var(--orange);color:#fff}
+.dark{background:var(--dark);color:#fff}
+.soft{background:var(--orange);color:#fff}
+.danger{background:#fff0f0;color:var(--danger)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.topline{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.session{font-size:12px;line-height:1.6}
+.logout{border:1px solid #ff3a3a;background:#fff;color:#e52424;border-radius:7px;padding:7px 11px;font-weight:700}
+.grid{display:grid;gap:12px;margin-top:15px}
+.module{width:100%;border:0;border-radius:7px;min-height:59px;color:#fff;font-size:16px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:12px}
+.module span{font-size:24px}
+.module:nth-child(1){background:var(--orange)}
+.module:nth-child(2){background:var(--dark)}
+.module:nth-child(3){background:var(--green)}
+.moduleTitle{text-align:center;color:var(--orange);font-size:17px;font-weight:900;margin-bottom:12px}
+.formHeader{margin:0 0 5px;padding:14px 18px;border-bottom:1px solid #eee;display:grid;grid-template-columns:48px 1fr 48px;align-items:center}
+.formHeader h1{font-size:18px;color:var(--orange);margin:0;text-align:center}
+.backArrow{border:0;background:transparent;font-size:28px;text-align:left;padding:0;cursor:pointer}
+.count{color:var(--orange);font-size:22px;font-weight:900}
+.awbPanel{border:1px solid #ddd;border-radius:10px;overflow:hidden;margin-top:8px}
+.awbPanelHead{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;background:#fff}
+.awbTitle{font-size:13px;font-weight:700}
+.awbCountBig{font-size:25px;color:var(--orange);font-weight:900;line-height:1}
+.miniBtn{border:0;background:var(--orange);color:#fff;border-radius:7px;padding:8px 10px;font-size:11px;font-weight:800;cursor:pointer}
+.awbListVertical{border-top:1px solid #eee}
+.awbRow{display:grid;grid-template-columns:25px 1fr 30px;align-items:center;gap:6px;padding:10px 11px;border-bottom:1px solid #eee;font-size:13px}
+.awbRow:last-child{border-bottom:0}
+.awbDelete{border:0;background:transparent;color:red;font-size:20px;cursor:pointer}
 .inlineScanner{margin-top:10px}
-#reader{width:100%;overflow:hidden;border-radius:14px;background:#111;margin-top:10px}
-#reader video{width:100%!important;border-radius:12px}
+#reader{width:100%;overflow:hidden;border-radius:12px;background:#111;margin-top:10px}
+#reader video{width:100%!important;border-radius:10px}
 .cameraBox{display:none;margin-top:10px}
 .cameraBox video{width:100%;max-height:420px;object-fit:cover;background:#111;border-radius:12px}
 .cameraActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.photoBox{border:1px solid #ddd;border-radius:11px;padding:10px;background:#fff}
+.thumbs{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
+.thumb{position:relative;border-radius:9px;overflow:hidden;background:#eee;min-height:110px}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb button{position:absolute;right:5px;top:5px;width:26px;height:26px;border:0;border-radius:50%;background:#0009;color:#fff}
+.snCard{display:grid;grid-template-columns:94px 1fr 26px;gap:9px;align-items:center;padding:9px;border:1px solid #ddd;border-radius:9px;margin-top:9px;background:#fff}
+.snCard img{width:94px;height:74px;object-fit:cover;border-radius:7px;background:#eee}
+.snInputWrap label{margin:0 0 5px}
+.snInputWrap input{min-height:42px;padding:9px 10px}
+.snRemove{border:0;background:transparent;color:red;font-size:21px}
+.snLimit{font-size:11px;color:#4169a9;background:#edf4ff;border-radius:6px;padding:6px 9px;text-align:center;margin-top:9px}
+.status{margin-top:12px;padding:11px;border-radius:9px;font-size:13px;display:none}
+.status.show{display:block}
+.status.ok{background:#e8f7ee;color:#176b3b}
+.status.bad{background:#fff0f0;color:#a51f1f}
+.status.wait{background:#fff5e7;color:#8b5800}
+.loginInfo{margin-top:16px;background:#f5f5f5;border-radius:9px;padding:14px;font-size:13px}
+.sectionCap{font-size:14px;font-weight:900;color:var(--orange);margin:18px 0 8px}
+.footer{text-align:center;color:#a0a0a0;font-size:10px;margin:20px 0}
+@media(max-width:390px){
+  .app{width:100%}
+  .card{margin-left:12px;margin-right:12px}
+  .row{grid-template-columns:1fr}
+  .snCard{grid-template-columns:78px 1fr 24px}
+  .snCard img{width:78px;height:65px}
+}
 
 </style>
 </head>
-<body><div class="app">
-<header class="brand"><img src="logo.png" alt="H Joel Logistics"><div class="sub">LAST MILE OPERATION</div></header>
 
-<section id="loginView" class="card">
-  <h1>Login Last Mile</h1><div class="muted">Masuk menggunakan Username</div>
-  <label>Username</label><input id="usernameInput" autocomplete="username" placeholder="Contoh: Aziz21">
-  <button class="btn primary" style="margin-top:14px" onclick="login()">MASUK</button>
-  <div id="loginStatus" class="status"></div>
-  
-</section>
+<body>
+<div class="app">
+  <header class="brand">
+    <img src="logo.png" alt="H JOEL LOGISTICS">
+    <div class="sub">LAST MILE</div>
+  </header>
 
-<section id="homeView" class="hidden">
-  <div class="card topline"><div class="session"><b id="sessUser"></b><br><span class="muted" id="sessOrigin"></span></div><button class="logout" onclick="logout()">Logout</button></div>
-  <div class="card"><h1>Pilih Modul</h1><div class="muted">Semua transaksi otomatis merekam Username dan Origin.</div>
-    <div class="grid" style="margin-top:14px">
-      <button class="module" onclick="openModule('outbound')"><span>🚚</span>Outbound</button>
-      <button class="module" onclick="openModule('bast')"><span>📄</span>BAST Back</button>
-      <button class="module" onclick="openModule('return')"><span>↩️</span>Return</button>
+  <section id="loginView" class="card">
+    <div class="moduleTitle">LOGIN</div>
+    <label>Username</label>
+    <input id="usernameInput" autocomplete="username" placeholder="Masukkan Username">
+    <button class="btn primary" style="margin-top:14px" onclick="login()">LOGIN</button>
+    <div class="loginInfo">Masuk menggunakan Username</div>
+    <div id="loginStatus" class="status"></div>
+  </section>
+
+  <section id="homeView" class="hidden">
+    <div class="card">
+      <div class="moduleTitle">PILIH MODUL</div>
+      <div class="grid">
+        <button class="module" onclick="openModule('outbound')"><span>⇧</span>OUTBOUND</button>
+        <button class="module" onclick="openModule('bast')"><span>↩</span>BAST BACK</button>
+        <button class="module" onclick="openModule('return')"><span>↩</span>RETURN</button>
+      </div>
+      <hr style="border:0;border-top:1px solid #eee;margin:20px 0 12px">
+      <div class="session">
+        <b>Login sebagai :</b><br>
+        Username&nbsp;&nbsp;: <b id="sessUser"></b><br>
+        Origin&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <b id="sessOrigin"></b>
+      </div>
+      <button class="logout" style="margin-top:10px" onclick="logout()">LOGOUT</button>
     </div>
-  </div>
-</section>
+  </section>
 
-<section id="formView" class="hidden">
- <div class="card topline"><div><h1 id="formTitle">Outbound</h1><div class="muted" id="formHint"></div></div><button class="logout" onclick="goHome()">← Menu</button></div>
- <div class="card">
-   <label>AWB <span class="count" id="awbCount">0</span></label>
-   <div class="row">
-     <button class="btn dark" id="btnStartScanner" onclick="scanAWB()">📷 MULAI SCAN AWB</button>
-     <button class="btn danger hidden" id="btnStopScanner" onclick="stopScanner()">⛔ STOP SCANNER</button>
-     <button class="btn soft" onclick="manualAWB()">＋ Manual</button>
-   </div>
-   <div id="reader" class="inlineScanner"></div>
-   <div id="awbList" class="list"></div>
-   <label>Nama Driver</label><input id="driverName" placeholder="Nama driver">
-   <label>Plat No</label><input id="plateNo" placeholder="Contoh: F 1234 ABC" autocapitalize="characters">
-   <label>Vendor</label><select id="vendor"><option value="">Pilih Vendor</option></select>
+  <section id="formView" class="hidden">
+    <div class="formHeader">
+      <button class="backArrow" onclick="goHome()">←</button>
+      <h1 id="formTitle">OUTBOUND</h1>
+      <div></div>
+    </div>
 
-   <div id="driverPhotoSection">
-     <label>Foto Driver</label>
-     <div class="photoBox">
-       <button class="btn primary" id="btnOpenDriverCamera" type="button" onclick="openDriverCamera()">📷 BUKA KAMERA DRIVER</button>
-       <div id="driverCameraBox" class="cameraBox">
-         <video id="driverVideo" autoplay playsinline muted></video>
-         <div class="cameraActions">
-           <button class="btn primary" type="button" onclick="captureDriverPhoto()">📸 AMBIL FOTO</button>
-           <button class="btn danger" type="button" onclick="closeDriverCamera()">TUTUP</button>
-         </div>
-       </div>
-       <div id="driverPreview" class="thumbs"></div>
-       <button class="btn soft hidden" id="btnRetakeDriver" style="margin-top:8px" type="button" onclick="openDriverCamera()">🔄 FOTO ULANG</button>
-     </div>
-   </div>
+    <div class="card" style="margin-top:8px">
+      <div class="muted" id="formHint"></div>
 
-   <div id="returnExtra" class="hidden">
-     <label>Keterangan</label><select id="keterangan"><option value="">Pilih Keterangan</option></select>
-     <label>Reason</label><textarea id="reason" placeholder="Tuliskan reason"></textarea>
-   </div>
+      <label>AWB</label>
+      <div class="awbPanel">
+        <div class="awbPanelHead">
+          <div>
+            <div class="awbTitle">Jumlah AWB</div>
+            <div class="awbCountBig" id="awbCount">0</div>
+          </div>
+          <button class="miniBtn" id="awbToggleBtn" type="button" onclick="toggleAWBList()">LIHAT / MINIMIZE⌃</button>
+        </div>
+        <div id="awbList" class="awbListVertical"></div>
+      </div>
 
-   <div id="snSection" class="hidden"><label>Foto SN <span class="count" id="snCount">0</span></label><div class="photoBox">
-     <button class="btn dark" onclick="document.getElementById('snPhotoInput').click()">📸 Ambil Foto SN</button>
-     <input id="snPhotoInput" class="hidden" type="file" accept="image/*" capture="environment">
-     <div class="progress" id="ocrProgress"></div><div id="snList" class="list"></div><div id="snPreview" class="thumbs"></div>
-   </div></div>
+      <div id="reader" class="inlineScanner"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn dark" id="btnStartScanner" onclick="scanAWB()">▥ SCAN AWB</button>
+        <button class="btn danger hidden" id="btnStopScanner" onclick="stopScanner()">⛔ STOP SCANNER</button>
+        <button class="btn soft" onclick="manualAWB()">＋ TAMBAH AWB MANUAL</button>
+      </div>
 
-   <button class="btn primary" style="margin-top:18px" id="saveBtn" onclick="saveData()">SIMPAN DATA</button>
-   <div id="saveStatus" class="status"></div>
- </div>
-</section>
+      <label>Nama Driver</label>
+      <input id="driverName" placeholder="Nama Driver">
 
-<div class="footer">H JOEL LOGISTICS • Last Mile PWA</div>
+      <label>Plat No</label>
+      <input id="plateNo" placeholder="Contoh: F 1234 ABC" autocapitalize="characters">
+
+      <label>Vendor</label>
+      <select id="vendor"><option value="">Pilih Vendor</option></select>
+
+      <div id="driverPhotoSection">
+        <div class="sectionCap">FOTO DRIVER (1 FOTO)</div>
+        <div class="photoBox">
+          <button class="btn primary" id="btnOpenDriverCamera" type="button" onclick="openDriverCamera()">📷 BUKA KAMERA DRIVER</button>
+          <div id="driverCameraBox" class="cameraBox">
+            <video id="driverVideo" autoplay playsinline muted></video>
+            <div class="cameraActions">
+              <button class="btn primary" type="button" onclick="captureDriverPhoto()">📸 AMBIL FOTO</button>
+              <button class="btn danger" type="button" onclick="closeDriverCamera()">TUTUP</button>
+            </div>
+          </div>
+          <div id="driverPreview" class="thumbs"></div>
+          <button class="btn dark hidden" id="btnRetakeDriver" style="margin-top:8px" type="button" onclick="openDriverCamera()">FOTO ULANG</button>
+        </div>
+      </div>
+
+      <div id="returnExtra" class="hidden">
+        <label>Keterangan</label>
+        <select id="keterangan"><option value="">Pilih Keterangan</option></select>
+        <label>Reason</label>
+        <textarea id="reason" placeholder="Tuliskan Reason"></textarea>
+      </div>
+
+      <div id="snSection" class="hidden">
+        <div class="sectionCap">FOTO SN (BERULANG – MAKSIMAL 2 FOTO)</div>
+        <div class="photoBox">
+          <button class="btn primary" onclick="document.getElementById('snPhotoInput').click()">📷 AMBIL FOTO SN</button>
+          <input id="snPhotoInput" class="hidden" type="file" accept="image/*" capture="environment">
+          <div class="progress" id="ocrProgress"></div>
+          <div id="snList"></div>
+          <div id="snPreview" class="hidden"></div>
+          <div class="snLimit">Maksimal 2 Foto SN. Jumlah No SN mengikuti jumlah foto.</div>
+        </div>
+      </div>
+
+      <button class="btn primary" style="margin-top:18px" id="saveBtn" onclick="saveData()">▣ SIMPAN DATA</button>
+      <div id="saveStatus" class="status"></div>
+    </div>
+  </section>
+
+  <div class="footer">H JOEL LOGISTICS · LAST MILE</div>
 </div>
 <script>
+
 // GANTI setelah deploy Apps Script Web App (/exec)
-const API_URL = 'https://script.google.com/macros/s/AKfycbwx52muo2JAdLMH4T4-1v08MjoqgO5xkka2URHoHkUblCEd94LkeXDrOo1UeVO0SDnFfg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwvSTmZkm9CGrEW3kJG8Du_THFSNX0fE49y97wElfXzANkfewhp-LuMtyPqZD8P4DWwCg/exec';
 let cfg={vendor:[],keterangan:[],users:[]}, session=null, moduleName='', awbs=[], snItems=[], driverPhoto='';
 let scanner=null, scanLock=false, driverPhotoStream=null;
 
@@ -122,12 +239,48 @@ async function login(){hideStatus('loginStatus');const u=$('usernameInput').valu
 function showHome(){$('loginView').classList.add('hidden');$('formView').classList.add('hidden');$('homeView').classList.remove('hidden');$('sessUser').textContent=session.username;$('sessOrigin').textContent=session.origin}
 function logout(){localStorage.removeItem('hjoelSession');session=null;$('homeView').classList.add('hidden');$('formView').classList.add('hidden');$('loginView').classList.remove('hidden');$('usernameInput').value=''}
 async function goHome(){await stopScanner();closeDriverCamera();resetForm();showHome()}
-function openModule(m){moduleName=m;resetForm();$('homeView').classList.add('hidden');$('formView').classList.remove('hidden');$('formTitle').textContent=m==='outbound'?'Outbound':m==='bast'?'BAST Back':'Return';$('formHint').textContent=m==='outbound'?'AWB dan Foto SN dapat ditambahkan berulang.':m==='bast'?'AWB dapat di-scan berulang.':'Return hanya menerima 1 AWB.';$('snSection').classList.toggle('hidden',m==='bast');$('returnExtra').classList.toggle('hidden',m!=='return');$('driverPhotoSection').classList.toggle('hidden',m==='return')}
-function resetForm(){awbs=[];snItems=[];driverPhoto='';['driverName','plateNo','reason'].forEach(x=>$(x).value='');['vendor','keterangan'].forEach(x=>$(x).selectedIndex=0);$('snPhotoInput').value='';closeDriverCamera();$('driverPreview').innerHTML='';$('btnRetakeDriver').classList.add('hidden');$('btnOpenDriverCamera').classList.remove('hidden');$('snPreview').innerHTML='';$('ocrProgress').textContent='';hideStatus('saveStatus');renderAWB();renderSN()}
+function openModule(m){moduleName=m;resetForm();$('homeView').classList.add('hidden');$('formView').classList.remove('hidden');$('formTitle').textContent=m==='outbound'?'OUTBOUND':m==='bast'?'BAST BACK':'RETURN';$('formHint').textContent=m==='outbound'?'AWB dan Foto SN dapat ditambahkan berulang.':m==='bast'?'AWB dapat di-scan berulang.':'Return hanya menerima 1 AWB.';$('snSection').classList.toggle('hidden',m==='bast');$('returnExtra').classList.toggle('hidden',m!=='return');$('driverPhotoSection').classList.toggle('hidden',m==='return')}
+function resetForm(){awbListCollapsed=false;awbs=[];snItems=[];driverPhoto='';['driverName','plateNo','reason'].forEach(x=>$(x).value='');['vendor','keterangan'].forEach(x=>$(x).selectedIndex=0);$('snPhotoInput').value='';closeDriverCamera();$('driverPreview').innerHTML='';$('btnRetakeDriver').classList.add('hidden');$('btnOpenDriverCamera').classList.remove('hidden');$('snPreview').innerHTML='';$('ocrProgress').textContent='';hideStatus('saveStatus');renderAWB();renderSN();if($('awbList'))$('awbList').classList.remove('hidden');if($('awbToggleBtn'))$('awbToggleBtn').textContent='MINIMIZE⌃'}
 function addAWB(v){v=String(v||'').trim();if(!v)return;if(moduleName==='return'&&awbs.length){awbs=[v]}else if(!awbs.includes(v))awbs.push(v);renderAWB();beep()}
 function manualAWB(){const v=prompt(moduleName==='return'?'Masukkan 1 AWB':'Masukkan AWB');if(v)addAWB(v)}
-function renderAWB(){$('awbCount').textContent=awbs.length;$('awbList').innerHTML=awbs.map((x,i)=>`<span class="chip">${esc(x)} <button onclick="awbs.splice(${i},1);renderAWB()">×</button></span>`).join('')}
-function renderSN(){$('snCount').textContent=snItems.length;$('snList').innerHTML=snItems.map((x,i)=>`<span class="chip">${esc(x.sn||'SN belum terbaca')} <button onclick="removeSN(${i})">×</button></span>`).join('');$('snPreview').innerHTML=snItems.map((x,i)=>`<div class="thumb"><img src="${x.photo}"><button onclick="removeSN(${i})">×</button></div>`).join('')}
+let awbListCollapsed=false;
+function toggleAWBList(){
+  awbListCollapsed=!awbListCollapsed;
+  $('awbList').classList.toggle('hidden',awbListCollapsed);
+  $('awbToggleBtn').textContent=awbListCollapsed?'LIHAT⌄':'MINIMIZE⌃';
+}
+function renderAWB(){
+  $('awbCount').textContent=awbs.length;
+  const list=$('awbList');
+  if(!awbs.length){
+    list.innerHTML='<div class="muted" style="padding:11px">Belum ada AWB.</div>';
+    return;
+  }
+  list.innerHTML=awbs.map((x,i)=>`
+    <div class="awbRow">
+      <div>${i+1}.</div>
+      <div>${esc(x)}</div>
+      <button class="awbDelete" type="button" onclick="awbs.splice(${i},1);renderAWB()">×</button>
+    </div>`).join('');
+}
+function renderSN(){
+  $('snCount') && ($('snCount').textContent=snItems.length);
+  const list=$('snList');
+  if(!snItems.length){
+    list.innerHTML='<div class="muted" style="padding:10px 2px">Belum ada Foto SN.</div>';
+    return;
+  }
+  list.innerHTML=snItems.map((x,i)=>`
+    <div class="snCard">
+      <img src="${x.photo}" alt="Foto SN ${i+1}">
+      <div class="snInputWrap">
+        <label>No SN ${i+1}</label>
+        <input value="${esc(x.sn||'')}" placeholder="No SN menyusul" 
+          oninput="snItems[${i}].sn=this.value.trim()">
+      </div>
+      <button class="snRemove" type="button" onclick="removeSN(${i})">×</button>
+    </div>`).join('');
+}
 function removeSN(i){snItems.splice(i,1);renderSN()}
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function beep(){try{const a=new (window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=850;g.gain.value=.08;o.start();o.stop(a.currentTime+.08)}catch(e){}}
@@ -251,7 +404,7 @@ function closeDriverCamera(){
   if(!driverPhoto && $('btnOpenDriverCamera'))$('btnOpenDriverCamera').classList.remove('hidden');
 }
 
-$('snPhotoInput').addEventListener('change',async e=>{
+$('snPhotoInput').addEventListener('change',async e=>{if(snItems.length>=2){status('saveStatus','Maksimal 2 Foto SN. Hapus salah satu jika ingin mengganti.','bad');e.target.value='';return;}
   const f=e.target.files[0];
   if(!f)return;
   const photo=await compressFile(f);
@@ -262,7 +415,7 @@ $('snPhotoInput').addEventListener('change',async e=>{
   if(moduleName==='return'&&snItems.length>1)snItems=snItems.slice(-1);
   renderSN();
 });
-function validate(){if(!awbs.length)return 'AWB belum di-scan';if(moduleName==='return'&&awbs.length!==1)return 'Return harus 1 AWB';if(!$('driverName').value.trim())return 'Nama Driver wajib diisi';if(!$('plateNo').value.trim())return 'Plat No wajib diisi';if(!$('vendor').value)return 'Vendor wajib dipilih';if(moduleName!=='return'&&!driverPhoto)return 'Foto Driver wajib diambil';if(moduleName==='return'&&!$('keterangan').value)return 'Keterangan wajib dipilih';if(moduleName==='return'&&!$('reason').value.trim())return 'Reason wajib diisi';if(moduleName==='return'&&!snItems.length)return 'Foto SN wajib diambil';return ''}
+function validate(){if(!awbs.length)return 'AWB belum di-scan';if(moduleName==='return'&&awbs.length!==1)return 'Return harus 1 AWB';if(!$('driverName').value.trim())return 'Nama Driver wajib diisi';if(!$('plateNo').value.trim())return 'Plat No wajib diisi';if(!$('vendor').value)return 'Vendor wajib dipilih';if(moduleName!=='return'&&!driverPhoto)return 'Foto Driver wajib diambil';if(moduleName==='return'&&!$('keterangan').value)return 'Keterangan wajib dipilih';if(moduleName==='return'&&!$('reason').value.trim())return 'Reason wajib diisi';if((moduleName==='outbound'||moduleName==='return')&&!snItems.length)return 'Foto SN wajib diambil';return ''}
 async function saveData(){await stopScanner();closeDriverCamera();const v=validate();if(v)return status('saveStatus',v,'bad');const requestId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));const payload={requestId,module:moduleName,username:session.username,origin:session.origin,awbs,driverName:$('driverName').value.trim(),plateNo:$('plateNo').value.trim().toUpperCase(),vendor:$('vendor').value,keterangan:$('keterangan').value,reason:$('reason').value.trim(),driverPhoto,sns:snItems.map(x=>x.sn),snPhotos:snItems.map(x=>x.photo)};$('saveBtn').disabled=true;status('saveStatus','Mengirim data...','wait');try{if(API_URL.includes('PASTE_'))throw new Error('Isi API_URL pada index.html dengan URL Apps Script /exec'); const fd=new URLSearchParams();fd.set('payload',JSON.stringify(payload)); await fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:fd.toString()}); const ok=await waitStatus(requestId);if(!ok.ok)throw new Error(ok.message||'Gagal menyimpan');status('saveStatus',ok.message||'Data tersimpan','ok');setTimeout(()=>goHome(),1200)}catch(e){status('saveStatus',e.message,'bad')}finally{$('saveBtn').disabled=false}}
 async function waitStatus(id){for(let i=0;i<12;i++){await new Promise(r=>setTimeout(r,1000));try{const d=await jsonp({action:'status',requestId:id},5000);if(!d.pending)return d}catch(e){}}throw new Error('Server belum memberi konfirmasi. Cek Apps Script dan Sheet.')}
 
