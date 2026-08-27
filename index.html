@@ -299,7 +299,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
           <div id="snList"></div>
           <div id="snPreview" class="hidden"></div>
           <div class="snLimit" id="snLimitInfo">Maksimal Foto SN = Jumlah AWB (0)</div>
-          <div class="muted" style="margin-top:7px">Foto disimpan full. Sistem hanya membaca barcode pada bagian atas foto. Jika No SN belum terbaca, data tetap dapat disimpan.</div>
+          
         </div>
       </div>
 
@@ -941,8 +941,14 @@ return ''}
 async function uploadPhotoNow(dataUrl,type){
   if(!dataUrl)throw new Error('Foto kosong');
 
+  const requestId=
+    (crypto.randomUUID
+      ? crypto.randomUUID()
+      : Date.now()+'-'+Math.random().toString(36).slice(2));
+
   const payload={
     action:'uploadPhoto',
+    requestId:requestId,
     type:type,
     username:session?session.username:'',
     origin:session?session.origin:'',
@@ -953,23 +959,22 @@ async function uploadPhotoNow(dataUrl,type){
   const fd=new URLSearchParams();
   fd.set('payload',JSON.stringify(payload));
 
-  const response=await fetch(
+  // Apps Script Web App sering melakukan redirect/CORS pada POST.
+  // Karena itu upload dikirim no-cors, lalu hasilnya dicek
+  // melalui endpoint status menggunakan requestId.
+  await fetch(
     API_URL,
     {
       method:'POST',
-      headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+      mode:'no-cors',
+      headers:{
+        'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'
+      },
       body:fd.toString()
     }
   );
 
-  const text=await response.text();
-  let result;
-
-  try{
-    result=JSON.parse(text);
-  }catch(_){
-    throw new Error('Respons upload foto tidak valid');
-  }
+  const result=await waitStatus(requestId);
 
   if(!result.ok){
     throw new Error(result.message||'Upload foto gagal');
@@ -979,7 +984,16 @@ async function uploadPhotoNow(dataUrl,type){
 }
 
 async function saveData(){await stopScanner();closeDriverCamera();closeSnCamera();const v=validate();if(v)return status('saveStatus',v,'bad');const requestId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));const payload={requestId,module:moduleName,username:session.username,origin:session.origin,awbs,driverName:$('driverName').value.trim(),plateNo:$('plateNo').value.trim().toUpperCase(),vendor:$('vendor').value,keterangan:$('keterangan').value,reason:$('reason').value.trim(),driverPhotoUrl,sns:snItems.map(x=>x.sn),snPhotoUrls:snItems.map(x=>x.url||'')};$('saveBtn').disabled=true;status('saveStatus','Mengirim data...','wait');try{if(API_URL.includes('PASTE_'))throw new Error('Isi API_URL pada index.html dengan URL Apps Script /exec'); const fd=new URLSearchParams();fd.set('payload',JSON.stringify(payload)); await fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:fd.toString()}); const ok=await waitStatus(requestId);if(!ok.ok)throw new Error(ok.message||'Gagal menyimpan');status('saveStatus',ok.message||'Data tersimpan','ok');setTimeout(()=>goHome(),1200)}catch(e){status('saveStatus',e.message,'bad')}finally{$('saveBtn').disabled=false}}
-async function waitStatus(id){for(let i=0;i<12;i++){await new Promise(r=>setTimeout(r,1000));try{const d=await jsonp({action:'status',requestId:id},5000);if(!d.pending)return d}catch(e){}}throw new Error('Server belum memberi konfirmasi. Cek Apps Script dan Sheet.')}
+async function waitStatus(id){
+  for(let i=0;i<30;i++){
+    await new Promise(r=>setTimeout(r,1000));
+    try{
+      const d=await jsonp({action:'status',requestId:id},7000);
+      if(!d.pending)return d;
+    }catch(e){}
+  }
+  throw new Error('Server belum memberi konfirmasi. Cek Apps Script dan koneksi internet.');
+}
 
 (async()=>{if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});await loadConfig();try{session=JSON.parse(localStorage.getItem('hjoelSession')||'null')}catch(_){ } if(session){try{const d=await jsonp({action:'login',username:session.username});if(d.ok&&d.origin===session.origin)showHome();else logout()}catch(_){logout()}}})();
 </script></body></html>
