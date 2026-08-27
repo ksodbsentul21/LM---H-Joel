@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#f57c00" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Last Mile HJ" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<title>Last Mile - H Joel Logistics</title>
+<script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+:root{--o:#f57c00;--d:#24282c;--bg:#f4f6f8;--mut:#667085;--ok:#16835b;--bad:#c62828;--card:#fff;--line:#e5e7eb}
+*{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--d)}
+.app{max-width:720px;margin:auto;min-height:100vh;padding:env(safe-area-inset-top) 14px calc(24px + env(safe-area-inset-bottom))}
+.brand{background:#fff;border-radius:0 0 20px 20px;box-shadow:0 5px 24px #00000010;padding:14px;text-align:center;position:sticky;top:0;z-index:10}.brand img{max-width:315px;width:88%;height:auto}.sub{font-size:12px;color:var(--mut);font-weight:700;letter-spacing:.12em;margin-top:4px}
+.card{background:var(--card);border-radius:18px;padding:18px;margin-top:14px;box-shadow:0 5px 22px #1118270c;border:1px solid #eef0f2}.hidden{display:none!important}
+h1{font-size:22px;margin:0 0 6px}.muted{color:var(--mut);font-size:13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.module{border:0;border-radius:18px;padding:20px 10px;font-size:16px;font-weight:800;background:white;box-shadow:0 4px 18px #0001;min-height:110px}.module span{display:block;font-size:30px;margin-bottom:8px}.module:active,.btn:active{transform:scale(.98)}
+label{font-size:13px;font-weight:800;display:block;margin:14px 0 7px}input,select,textarea{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:16px;outline:none}input:focus,select:focus,textarea:focus{border-color:var(--o);box-shadow:0 0 0 3px #f57c0020}textarea{min-height:80px;resize:vertical}
+.btn{width:100%;border:0;border-radius:13px;padding:14px;font-size:15px;font-weight:800;cursor:pointer}.primary{background:var(--o);color:#fff}.dark{background:var(--d);color:white}.soft{background:#fff3e7;color:#a64f00}.danger{background:#fff0f0;color:var(--bad)}.row{display:flex;gap:9px}.row>*{flex:1}.topline{display:flex;align-items:center;justify-content:space-between;gap:10px}.badge{background:#fff3e7;color:#a64f00;border-radius:999px;padding:7px 10px;font-size:12px;font-weight:800}.list{margin-top:9px;display:flex;flex-wrap:wrap;gap:7px}.chip{background:#f2f4f7;border-radius:999px;padding:7px 10px;font-size:12px;display:flex;gap:7px;align-items:center}.chip button{border:0;background:transparent;color:#c62828;font-weight:900}.count{font-weight:800;color:var(--o)}
+.photoBox{border:1.5px dashed #f2a45a;border-radius:14px;padding:12px;background:#fffaf5}.thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:9px}.thumb{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:#eee}.thumb img{width:100%;height:100%;object-fit:cover}.thumb button{position:absolute;right:4px;top:4px;width:25px;height:25px;border-radius:50%;border:0;background:#0009;color:white}.status{margin-top:12px;padding:12px;border-radius:12px;font-size:13px;display:none}.status.show{display:block}.status.ok{background:#eaf8f2;color:#106846}.status.bad{background:#fff0f0;color:#a51f1f}.status.wait{background:#fff7e8;color:#8a5700}
+#scanner{position:fixed;inset:0;background:#000d;z-index:50;padding:20px;display:flex;flex-direction:column;justify-content:center}.scanbox{background:#111;border-radius:18px;overflow:hidden;max-width:640px;width:100%;margin:auto;padding:12px}.scanbox video{width:100%;max-height:68vh;border-radius:12px}.scanActions{display:flex;gap:8px;margin-top:10px}.scanActions button{flex:1}.session{font-size:13px}.logout{border:0;background:transparent;color:#c62828;font-weight:800}.install{margin-top:10px;font-size:12px;color:var(--mut);line-height:1.5}.progress{font-size:12px;color:var(--mut);margin-top:8px}.footer{text-align:center;color:#98a2b3;font-size:11px;margin:18px 0}
+@media(max-width:420px){.grid{grid-template-columns:1fr}.module{min-height:82px}.brand img{width:95%}}
+</style>
+</head>
+<body><div class="app">
+<header class="brand"><img src="logo.png" alt="H Joel Logistics"><div class="sub">LAST MILE OPERATION</div></header>
+
+<section id="loginView" class="card">
+  <h1>Login Last Mile</h1><div class="muted">Masuk menggunakan Username yang terdaftar di Sheet Username.</div>
+  <label>Username</label><input id="usernameInput" autocomplete="username" placeholder="Contoh: Aziz21">
+  <button class="btn primary" style="margin-top:14px" onclick="login()">MASUK</button>
+  <div id="loginStatus" class="status"></div>
+  <div class="install">Aplikasi ini dapat dipasang di Android melalui menu <b>Install app</b>. Di iPhone: Safari → Share → <b>Add to Home Screen</b>.</div>
+</section>
+
+<section id="homeView" class="hidden">
+  <div class="card topline"><div class="session"><b id="sessUser"></b><br><span class="muted" id="sessOrigin"></span></div><button class="logout" onclick="logout()">Logout</button></div>
+  <div class="card"><h1>Pilih Modul</h1><div class="muted">Semua transaksi otomatis merekam Username dan Origin.</div>
+    <div class="grid" style="margin-top:14px">
+      <button class="module" onclick="openModule('outbound')"><span>🚚</span>Outbound</button>
+      <button class="module" onclick="openModule('bast')"><span>📄</span>BAST Back</button>
+      <button class="module" onclick="openModule('return')"><span>↩️</span>Return</button>
+    </div>
+  </div>
+</section>
+
+<section id="formView" class="hidden">
+ <div class="card topline"><div><h1 id="formTitle">Outbound</h1><div class="muted" id="formHint"></div></div><button class="logout" onclick="goHome()">← Menu</button></div>
+ <div class="card">
+   <label>AWB <span class="count" id="awbCount">0</span></label>
+   <div class="row"><button class="btn dark" onclick="scanAWB()">📷 Scan AWB</button><button class="btn soft" onclick="manualAWB()">＋ Manual</button></div>
+   <div id="awbList" class="list"></div>
+   <label>Nama Driver</label><input id="driverName" placeholder="Nama driver">
+   <label>Plat No</label><input id="plateNo" placeholder="Contoh: F 1234 ABC" autocapitalize="characters">
+   <label>Vendor</label><select id="vendor"><option value="">Pilih Vendor</option></select>
+
+   <div id="driverPhotoSection"><label>Foto Driver</label><div class="photoBox"><input id="driverPhotoInput" type="file" accept="image/*" capture="environment"><div id="driverPreview" class="thumbs"></div></div></div>
+
+   <div id="returnExtra" class="hidden">
+     <label>Keterangan</label><select id="keterangan"><option value="">Pilih Keterangan</option></select>
+     <label>Reason</label><textarea id="reason" placeholder="Tuliskan reason"></textarea>
+   </div>
+
+   <div id="snSection" class="hidden"><label>Foto SN <span class="count" id="snCount">0</span></label><div class="photoBox">
+     <button class="btn dark" onclick="document.getElementById('snPhotoInput').click()">📸 Ambil Foto SN</button>
+     <input id="snPhotoInput" class="hidden" type="file" accept="image/*" capture="environment">
+     <div class="progress" id="ocrProgress"></div><div id="snList" class="list"></div><div id="snPreview" class="thumbs"></div>
+   </div></div>
+
+   <button class="btn primary" style="margin-top:18px" id="saveBtn" onclick="saveData()">SIMPAN DATA</button>
+   <div id="saveStatus" class="status"></div>
+ </div>
+</section>
+
+<div id="scanner" class="hidden"><div class="scanbox"><video id="scanVideo" playsinline></video><div class="scanActions"><button class="btn primary" id="captureScanBtn">Tambah</button><button class="btn danger" onclick="stopScanner()">Selesai</button></div><div class="muted" style="color:#ddd;margin-top:8px">Arahkan barcode/QR ke kamera. Data duplikat otomatis ditolak.</div></div></div>
+<div class="footer">H JOEL LOGISTICS • Last Mile PWA</div>
+</div>
+<script>
+// GANTI setelah deploy Apps Script Web App (/exec)
+const API_URL = 'PASTE_APPS_SCRIPT_WEB_APP_URL_HERE';
+let cfg={vendor:[],keterangan:[],users:[]}, session=null, moduleName='', awbs=[], snItems=[], driverPhoto='';
+let codeReader=null, controls=null, scanMode='awb', lastScan='';
+
+const $=id=>document.getElementById(id);
+function status(id,msg,type='wait'){const el=$(id);el.className='status show '+type;el.textContent=msg}
+function hideStatus(id){$(id).className='status'}
+function jsonp(params,timeout=12000){return new Promise((resolve,reject)=>{if(API_URL.includes('PASTE_')) return reject(new Error('API_URL belum diisi di index.html')); const cb='cb_'+Date.now()+'_'+Math.random().toString(36).slice(2); const s=document.createElement('script'); const t=setTimeout(()=>{cleanup();reject(new Error('Timeout ke server'))},timeout); function cleanup(){clearTimeout(t);delete window[cb];s.remove()} window[cb]=d=>{cleanup();resolve(d)}; s.onerror=()=>{cleanup();reject(new Error('Gagal terhubung ke Apps Script'))}; const q=new URLSearchParams({...params,callback:cb,_:Date.now()}); s.src=API_URL+'?'+q; document.head.appendChild(s);})}
+async function loadConfig(){try{const d=await jsonp({action:'config'});if(!d.ok)throw new Error(d.message);cfg=d;fillSelect('vendor',d.vendor);fillSelect('keterangan',d.keterangan)}catch(e){status('loginStatus',e.message,'bad')}}
+function fillSelect(id,arr){const el=$(id),first=el.options[0]?.outerHTML||'<option value="">Pilih</option>';el.innerHTML=first;arr.forEach(v=>{const o=document.createElement('option');o.value=o.textContent=v;el.appendChild(o)})}
+async function login(){hideStatus('loginStatus');const u=$('usernameInput').value.trim();if(!u)return status('loginStatus','Username wajib diisi','bad');status('loginStatus','Memeriksa username...','wait');try{const d=await jsonp({action:'login',username:u});if(!d.ok)throw new Error(d.message);session={username:d.username,origin:d.origin};localStorage.setItem('hjoelSession',JSON.stringify(session));showHome()}catch(e){status('loginStatus',e.message,'bad')}}
+function showHome(){$('loginView').classList.add('hidden');$('formView').classList.add('hidden');$('homeView').classList.remove('hidden');$('sessUser').textContent=session.username;$('sessOrigin').textContent=session.origin}
+function logout(){localStorage.removeItem('hjoelSession');session=null;$('homeView').classList.add('hidden');$('formView').classList.add('hidden');$('loginView').classList.remove('hidden');$('usernameInput').value=''}
+function goHome(){resetForm();showHome()}
+function openModule(m){moduleName=m;resetForm();$('homeView').classList.add('hidden');$('formView').classList.remove('hidden');$('formTitle').textContent=m==='outbound'?'Outbound':m==='bast'?'BAST Back':'Return';$('formHint').textContent=m==='outbound'?'AWB dan Foto SN dapat ditambahkan berulang.':m==='bast'?'AWB dapat di-scan berulang.':'Return hanya menerima 1 AWB.';$('snSection').classList.toggle('hidden',m==='bast');$('returnExtra').classList.toggle('hidden',m!=='return');$('driverPhotoSection').classList.toggle('hidden',m==='return')}
+function resetForm(){awbs=[];snItems=[];driverPhoto='';['driverName','plateNo','reason'].forEach(x=>$(x).value='');['vendor','keterangan'].forEach(x=>$(x).selectedIndex=0);$('driverPhotoInput').value='';$('snPhotoInput').value='';$('driverPreview').innerHTML='';$('snPreview').innerHTML='';$('ocrProgress').textContent='';hideStatus('saveStatus');renderAWB();renderSN()}
+function addAWB(v){v=String(v||'').trim();if(!v)return;if(moduleName==='return'&&awbs.length){awbs=[v]}else if(!awbs.includes(v))awbs.push(v);renderAWB();beep()}
+function manualAWB(){const v=prompt(moduleName==='return'?'Masukkan 1 AWB':'Masukkan AWB');if(v)addAWB(v)}
+function renderAWB(){$('awbCount').textContent=awbs.length;$('awbList').innerHTML=awbs.map((x,i)=>`<span class="chip">${esc(x)} <button onclick="awbs.splice(${i},1);renderAWB()">×</button></span>`).join('')}
+function renderSN(){$('snCount').textContent=snItems.length;$('snList').innerHTML=snItems.map((x,i)=>`<span class="chip">${esc(x.sn||'SN belum terbaca')} <button onclick="removeSN(${i})">×</button></span>`).join('');$('snPreview').innerHTML=snItems.map((x,i)=>`<div class="thumb"><img src="${x.photo}"><button onclick="removeSN(${i})">×</button></div>`).join('')}
+function removeSN(i){snItems.splice(i,1);renderSN()}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function beep(){try{const a=new (window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=850;g.gain.value=.08;o.start();o.stop(a.currentTime+.08)}catch(e){}}
+async function scanAWB(){scanMode='awb';await startScanner()}
+async function startScanner(){if(!navigator.mediaDevices?.getUserMedia)return alert('Kamera tidak tersedia. Gunakan HTTPS / GitHub Pages.');$('scanner').classList.remove('hidden');lastScan='';try{const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});$('scanVideo').srcObject=stream;await $('scanVideo').play(); codeReader=new ZXing.BrowserMultiFormatReader(); codeReader.decodeFromVideoElementContinuously($('scanVideo'),(result,err)=>{if(result){const t=result.getText();if(t&&t!==lastScan){lastScan=t;addAWB(t);if(moduleName==='return')stopScanner();setTimeout(()=>lastScan='',900)}}}); $('captureScanBtn').onclick=()=>{const t=prompt('Jika barcode sulit terbaca, ketik AWB manual');if(t)addAWB(t)}}catch(e){alert('Kamera gagal dibuka: '+e.message);stopScanner()}}
+function stopScanner(){try{codeReader&&codeReader.reset()}catch(e){} const v=$('scanVideo');if(v.srcObject)v.srcObject.getTracks().forEach(t=>t.stop());v.srcObject=null;$('scanner').classList.add('hidden')}
+async function compressFile(file,max=1280,q=.72){const data=await fileToDataURL(file);const img=await loadImg(data);let w=img.width,h=img.height;if(Math.max(w,h)>max){const r=max/Math.max(w,h);w=Math.round(w*r);h=Math.round(h*r)}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);return c.toDataURL('image/jpeg',q)}
+function fileToDataURL(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)})} function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src})}
+$('driverPhotoInput').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;driverPhoto=await compressFile(f);$('driverPreview').innerHTML=`<div class="thumb"><img src="${driverPhoto}"></div>`});
+$('snPhotoInput').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;const photo=await compressFile(f);$('ocrProgress').textContent='Membaca No SN dari foto...';let sn='';try{sn=await decodeBarcodeFromImage(photo)}catch(_){ } if(!sn){try{const r=await Tesseract.recognize(photo,'eng',{logger:m=>{if(m.status==='recognizing text')$('ocrProgress').textContent='OCR '+Math.round((m.progress||0)*100)+'%'}});sn=pickSN(r.data.text)}catch(_){ }} if(!sn)sn=prompt('No SN belum terbaca. Masukkan No SN manual:','')||''; snItems.push({sn:sn.trim(),photo});renderSN();$('ocrProgress').textContent=sn?'No SN terbaca: '+sn:'Foto tersimpan, No SN kosong';e.target.value=''; if(moduleName==='return'&&snItems.length>1)snItems=snItems.slice(-1);renderSN()});
+async function decodeBarcodeFromImage(dataUrl){const r=new ZXing.BrowserMultiFormatReader();try{const x=await r.decodeFromImageUrl(dataUrl);return x?.getText()||''}finally{r.reset()}}
+function pickSN(text){const lines=String(text||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean); const labeled=lines.find(s=>/\b(sn|serial|s\/n)\b/i.test(s)&&/[A-Z0-9-]{5,}/i.test(s)); if(labeled){const m=labeled.match(/[A-Z0-9][A-Z0-9-]{4,}/ig);if(m)return m[m.length-1]} const candidates=(text.match(/[A-Z0-9][A-Z0-9-]{7,}/ig)||[]).filter(x=>!/^\d{1,4}$/.test(x));return candidates.sort((a,b)=>b.length-a.length)[0]||''}
+function validate(){if(!awbs.length)return 'AWB belum di-scan';if(moduleName==='return'&&awbs.length!==1)return 'Return harus 1 AWB';if(!$('driverName').value.trim())return 'Nama Driver wajib diisi';if(!$('plateNo').value.trim())return 'Plat No wajib diisi';if(!$('vendor').value)return 'Vendor wajib dipilih';if(moduleName!=='return'&&!driverPhoto)return 'Foto Driver wajib diambil';if(moduleName==='return'&&!$('keterangan').value)return 'Keterangan wajib dipilih';if(moduleName==='return'&&!$('reason').value.trim())return 'Reason wajib diisi';if(moduleName==='return'&&!snItems.length)return 'Foto SN wajib diambil';return ''}
+async function saveData(){const v=validate();if(v)return status('saveStatus',v,'bad');const requestId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));const payload={requestId,module:moduleName,username:session.username,origin:session.origin,awbs,driverName:$('driverName').value.trim(),plateNo:$('plateNo').value.trim().toUpperCase(),vendor:$('vendor').value,keterangan:$('keterangan').value,reason:$('reason').value.trim(),driverPhoto,sns:snItems.map(x=>x.sn),snPhotos:snItems.map(x=>x.photo)};$('saveBtn').disabled=true;status('saveStatus','Mengirim data...','wait');try{if(API_URL.includes('PASTE_'))throw new Error('Isi API_URL pada index.html dengan URL Apps Script /exec'); const fd=new URLSearchParams();fd.set('payload',JSON.stringify(payload)); await fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:fd.toString()}); const ok=await waitStatus(requestId);if(!ok.ok)throw new Error(ok.message||'Gagal menyimpan');status('saveStatus',ok.message||'Data tersimpan','ok');setTimeout(()=>goHome(),1200)}catch(e){status('saveStatus',e.message,'bad')}finally{$('saveBtn').disabled=false}}
+async function waitStatus(id){for(let i=0;i<12;i++){await new Promise(r=>setTimeout(r,1000));try{const d=await jsonp({action:'status',requestId:id},5000);if(!d.pending)return d}catch(e){}}throw new Error('Server belum memberi konfirmasi. Cek Apps Script dan Sheet.')}
+
+(async()=>{if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});await loadConfig();try{session=JSON.parse(localStorage.getItem('hjoelSession')||'null')}catch(_){ } if(session){try{const d=await jsonp({action:'login',username:session.username});if(d.ok&&d.origin===session.origin)showHome();else logout()}catch(_){logout()}}})();
+</script></body></html>
