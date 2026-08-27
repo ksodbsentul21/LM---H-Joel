@@ -367,7 +367,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
 }
 
-// GANTI setelah deploy Apps Script Web App (/exec)
+// PENTING: API_URL harus memakai deployment /exec yang berisi Code.gs terbaru, bukan deployment lama.
 const API_URL = 'https://script.google.com/macros/s/AKfycbwx52muo2JAdLMH4T4-1v08MjoqgO5xkka2URHoHkUblCEd94LkeXDrOo1UeVO0SDnFfg/exec';
 let cfg={vendor:[],keterangan:[],users:[]}, session=null, moduleName='', awbs=[], snItems=[], driverPhoto='';
 let scanner=null, scanLock=false, driverPhotoStream=null, snPhotoStream=null;
@@ -457,7 +457,41 @@ window.addEventListener('error',function(e){
 function jsonp(params,timeout=12000){return new Promise((resolve,reject)=>{if(API_URL.includes('PASTE_')) return reject(new Error('API_URL belum diisi di index.html')); const cb='cb_'+Date.now()+'_'+Math.random().toString(36).slice(2); const s=document.createElement('script'); const t=setTimeout(()=>{cleanup();reject(new Error('Timeout ke server'))},timeout); function cleanup(){clearTimeout(t);delete window[cb];s.remove()} window[cb]=d=>{cleanup();resolve(d)}; s.onerror=()=>{cleanup();reject(new Error('Gagal terhubung ke Apps Script'))}; const q=new URLSearchParams({...params,callback:cb,_:Date.now()}); s.src=API_URL+'?'+q; document.head.appendChild(s);})}
 async function loadConfig(){try{const d=await jsonp({action:'config'});if(!d.ok)throw new Error(d.message);cfg=d;fillSelect('vendor',d.vendor);fillSelect('keterangan',d.keterangan)}catch(e){status('loginStatus',e.message,'bad')}}
 function fillSelect(id,arr){const el=$(id),first=el.options[0]?.outerHTML||'<option value="">Pilih</option>';el.innerHTML=first;arr.forEach(v=>{const o=document.createElement('option');o.value=o.textContent=v;el.appendChild(o)})}
-async function login(){hideStatus('loginStatus');const u=$('usernameInput').value.trim();if(!u)return status('loginStatus','Username wajib diisi','bad');status('loginStatus','Memeriksa username...','wait');try{const d=await jsonp({action:'login',username:u});if(!d.ok)throw new Error(d.message);session={username:d.username,origin:d.origin};localStorage.setItem('hjoelSession',JSON.stringify(session));showHome()}catch(e){status('loginStatus',e.message,'bad')}}
+async function login(){
+  hideStatus('loginStatus');
+  const u=$('usernameInput').value.trim();
+  if(!u)return status('loginStatus','Username wajib diisi','bad');
+
+  status('loginStatus','Memeriksa username...','wait');
+
+  try{
+    const d=await jsonp({action:'login',username:u});
+
+    // Deteksi backend lama yang hanya merespons "API AKTIF"
+    if(d && d.success===true && /API AKTIF/i.test(String(d.message||''))){
+      throw new Error('Backend Apps Script masih versi lama. Update URL /exec di index.html ke deployment terbaru.');
+    }
+
+    if(!d || !d.ok){
+      throw new Error((d&&d.message)||'Login gagal');
+    }
+
+    session={
+      username:d.username,
+      origin:d.origin
+    };
+
+    localStorage.setItem(
+      'hjoelSession',
+      JSON.stringify(session)
+    );
+
+    showHome();
+
+  }catch(e){
+    status('loginStatus',e.message,'bad');
+  }
+}
 function showHome(){$('loginView').classList.add('hidden');$('formView').classList.add('hidden');$('homeView').classList.remove('hidden');$('sessUser').textContent=session.username;$('sessOrigin').textContent=session.origin}
 function logout(){localStorage.removeItem('hjoelSession');session=null;$('homeView').classList.add('hidden');$('formView').classList.add('hidden');$('loginView').classList.remove('hidden');$('usernameInput').value=''}
 async function goHome(){await stopScanner();closeDriverCamera();closeSnCamera();resetForm();showHome()}
