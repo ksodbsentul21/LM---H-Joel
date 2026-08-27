@@ -10,7 +10,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icon-192.png" />
 <title>Last Mile - H Joel Logistics</title>
-<meta name="app-version" content="wizard-navigation-fix-v3">
+<meta name="app-version" content="wizard-double-outbound-v4">
 <script src="https://unpkg.com/html5-qrcode"></script>
 <style>
 
@@ -283,6 +283,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
         <div id="awbList" class="awbListVertical"></div>
       </div>
 
+      <div class="muted" style="margin-top:8px">AWB yang sudah ada di Outbound atau ter-scan dua kali akan otomatis dicatat ke sheet Double Scan dan tidak masuk daftar simpan.</div>
       <div id="reader" class="inlineScanner"></div>
       <div class="row" style="margin-top:10px">
         <button class="btn dark" id="btnStartScanner" onclick="scanAWB()">▥ SCAN AWB</button>
@@ -367,7 +368,7 @@ if('serviceWorker' in navigator){
 }
 
 // GANTI setelah deploy Apps Script Web App (/exec)
-const API_URL = 'https://script.google.com/macros/s/AKfycbwx52muo2JAdLMH4T4-1v08MjoqgO5xkka2URHoHkUblCEd94LkeXDrOo1UeVO0SDnFfg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwvSTmZkm9CGrEW3kJG8Du_THFSNX0fE49y97wElfXzANkfewhp-LuMtyPqZD8P4DWwCg/exec';
 let cfg={vendor:[],keterangan:[],users:[]}, session=null, moduleName='', awbs=[], snItems=[], driverPhoto='';
 let scanner=null, scanLock=false, driverPhotoStream=null, snPhotoStream=null;
 
@@ -535,12 +536,63 @@ function resetForm(){
   awbListCollapsed=false;
   try{enforceSnLimit()}catch(e){console.error('enforceSnLimit',e)}
 }
-function addAWB(v){
-  v=String(v||'').trim().toUpperCase();
-  if(!v)return;
-  if(awbs.includes(v)){logDoubleScan(v);return;}
-  if(moduleName==='return'&&awbs.length){awbs=[v]}else{awbs.push(v)}
-  renderAWB();beep();
+async function checkAwbInOutbound(awb){
+  const value=String(awb||'').trim().toUpperCase();
+  if(!value)return {ok:false,exists:false};
+
+  try{
+    return await jsonp({
+      action:'checkAwb',
+      awb:value
+    },10000);
+  }catch(e){
+    console.warn('Check AWB Outbound gagal:',e);
+    // Jika server pengecekan gagal, jangan blok operasional scan.
+    return {ok:false,exists:false,checkError:true};
+  }
+}
+
+async function processAwbInput(rawAwb){
+  const awb=String(rawAwb||'').trim().toUpperCase();
+  if(!awb)return false;
+
+  // 1. Double dalam sesi aktif.
+  if(awbs.includes(awb)){
+    beepDuplicate();
+    logDoubleScan(awb,'SESSION','');
+    return false;
+  }
+
+  // 2. Double terhadap data yang sudah pernah tersimpan di Outbound.
+  status('saveStatus','Memeriksa AWB '+awb+'...','wait');
+  const check=await checkAwbInOutbound(awb);
+
+  if(check && check.exists){
+    beepDuplicate();
+    logDoubleScan(
+      awb,
+      'OUTBOUND',
+      check.outboundRow||''
+    );
+    return false;
+  }
+
+  hideStatus('saveStatus');
+
+  if(moduleName==='return' && awbs.length){
+    awbs=[awb];
+  }else{
+    awbs.push(awb);
+  }
+
+  renderAWB();
+  beep();
+  return true;
+}
+
+
+async function addAWB(v){
+  return await processAwbInput(v);
 }
 function manualAWB(){
   const overlay=$('awbModalOverlay');
@@ -566,7 +618,7 @@ function awbModalBackdrop(event){
   }
 }
 
-function submitManualAWB(){
+async function submitManualAWB(){
   const input=$('manualAwbInput');
   if(!input)return;
 
@@ -577,20 +629,14 @@ function submitManualAWB(){
     return;
   }
 
-  if(awbs.includes(value)){
-    logDoubleScan(value);
-    closeAwbModal();
-    return;
-  }
-  if(moduleName==='return' && awbs.length>=1){
-    awbs=[value];
-  }else{
-    awbs.push(value);
-  }
+  const saved=await processAwbInput(value);
 
-  renderAWB();
-  beep();
-  closeAwbModal();
+  if(saved || awbs.includes(value)){
+    closeAwbModal();
+  }else{
+    // Double scan sudah tercatat, modal ditutup agar operator bisa lanjut.
+    closeAwbModal();
+  }
 }
 
 document.addEventListener('keydown',function(e){
@@ -687,19 +733,14 @@ async function scanAWB(){
 
         if(moduleName==='return'){
           if(awbs.length<1){
-            addAWB(awb);
-            await stopScanner();
+            const accepted=await processAwbInput(awb);
+            if(accepted)await stopScanner();
           }
           scanLock=false;
           return;
         }
 
-        if(!awbs.includes(awb)){
-          addAWB(awb);
-        }else{
-          beepDuplicate();
-          logDoubleScan(awb);
-        }
+        await processAwbInput(awb);
         setTimeout(()=>scanLock=false,900);
       },
       function(){}
@@ -975,22 +1016,43 @@ function validate(){if(!awbs.length)return 'AWB belum di-scan';if(moduleName==='
 if(snItems.length>awbs.length)return 'Jumlah Foto SN tidak boleh melebihi jumlah AWB';
 return ''}
 
-function logDoubleScan(awb){
+function logDoubleScan(awb,doubleSource='SESSION',outboundRow=''){
   const payload={
-    action:'doubleScan',awb:String(awb||'').trim(),
+    action:'doubleScan',
+    awb:String(awb||'').trim().toUpperCase(),
     module:moduleName||'',
     username:session?session.username:'',
     origin:session?session.origin:'',
     driverName:$('driverName')?$('driverName').value.trim():'',
-    plateNo:$('plateNo')?$('plateNo').value.trim():'',
-    vendor:$('vendor')?$('vendor').value:''
+    plateNo:$('plateNo')?$('plateNo').value.trim().toUpperCase():'',
+    vendor:$('vendor')?$('vendor').value:'',
+    doubleSource:doubleSource,
+    outboundRow:outboundRow
   };
+
   const fd=new URLSearchParams();
   fd.set('payload',JSON.stringify(payload));
-  fetch(API_URL,{method:'POST',mode:'no-cors',
-    headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
-    body:fd.toString()}).catch(console.warn);
-  status('saveStatus','AWB '+awb+' terdeteksi double dan dicatat ke Double Scan.','bad');
+
+  fetch(API_URL,{
+    method:'POST',
+    mode:'no-cors',
+    headers:{
+      'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'
+    },
+    body:fd.toString()
+  }).catch(e=>console.warn('Double Scan log gagal:',e));
+
+  const sourceText=
+    doubleSource==='OUTBOUND'
+      ? 'sudah ada di sheet Outbound'
+      : 'sudah discan pada sesi ini';
+
+  status(
+    'saveStatus',
+    'AWB '+awb+' double ('+sourceText+') dan dicatat ke sheet Double Scan.',
+    'bad'
+  );
+
   if(navigator.vibrate)navigator.vibrate([120,80,120]);
 }
 
