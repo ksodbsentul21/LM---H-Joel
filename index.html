@@ -342,7 +342,13 @@ function logout(){localStorage.removeItem('hjoelSession');session=null;$('homeVi
 async function goHome(){await stopScanner();closeDriverCamera();closeSnCamera();resetForm();showHome()}
 function openModule(m){moduleName=m;resetForm();$('homeView').classList.add('hidden');$('formView').classList.remove('hidden');$('formTitle').textContent=m==='outbound'?'OUTBOUND':m==='bast'?'BAST BACK':'RETURN';$('formHint').textContent=m==='outbound'?'AWB dan Foto SN dapat ditambahkan berulang.':m==='bast'?'AWB dapat di-scan berulang.':'Return hanya menerima 1 AWB.';$('snSection').classList.toggle('hidden',m==='bast');$('returnExtra').classList.toggle('hidden',m!=='return');$('driverPhotoSection').classList.toggle('hidden',m==='return')}
 function resetForm(){closeSnCamera();awbListCollapsed=false;awbs=[];snItems=[];driverPhoto='';['driverName','plateNo','reason'].forEach(x=>$(x).value='');['vendor','keterangan'].forEach(x=>$(x).selectedIndex=0);closeDriverCamera();$('driverPreview').innerHTML='';$('btnRetakeDriver').classList.add('hidden');$('btnOpenDriverCamera').classList.remove('hidden');$('snPreview').innerHTML='';$('ocrProgress').textContent='';hideStatus('saveStatus');renderAWB();renderSN();if($('awbList'))$('awbList').classList.remove('hidden');if($('awbToggleBtn'))$('awbToggleBtn').textContent='MINIMIZE⌃';enforceSnLimit()}
-function addAWB(v){v=String(v||'').trim();if(!v)return;if(moduleName==='return'&&awbs.length){awbs=[v]}else if(!awbs.includes(v))awbs.push(v);renderAWB();beep()}
+function addAWB(v){
+  v=String(v||'').trim().toUpperCase();
+  if(!v)return;
+  if(awbs.includes(v)){logDoubleScan(v);return;}
+  if(moduleName==='return'&&awbs.length){awbs=[v]}else{awbs.push(v)}
+  renderAWB();beep();
+}
 function manualAWB(){
   const overlay=$('awbModalOverlay');
   const input=$('manualAwbInput');
@@ -378,9 +384,14 @@ function submitManualAWB(){
     return;
   }
 
+  if(awbs.includes(value)){
+    logDoubleScan(value);
+    closeAwbModal();
+    return;
+  }
   if(moduleName==='return' && awbs.length>=1){
     awbs=[value];
-  }else if(!awbs.includes(value)){
+  }else{
     awbs.push(value);
   }
 
@@ -770,6 +781,25 @@ function closeDriverCamera(){
 function validate(){if(!awbs.length)return 'AWB belum di-scan';if(moduleName==='return'&&awbs.length!==1)return 'Return harus 1 AWB';if(!$('driverName').value.trim())return 'Nama Driver wajib diisi';if(!$('plateNo').value.trim())return 'Plat No wajib diisi';if(!$('vendor').value)return 'Vendor wajib dipilih';if(moduleName!=='return'&&!driverPhoto)return 'Foto Driver wajib diambil';if(moduleName==='return'&&!$('keterangan').value)return 'Keterangan wajib dipilih';if(moduleName==='return'&&!$('reason').value.trim())return 'Reason wajib diisi';if((moduleName==='outbound'||moduleName==='return')&&!snItems.length)return 'Foto SN wajib diambil';
 if(snItems.length>awbs.length)return 'Jumlah Foto SN tidak boleh melebihi jumlah AWB';
 return ''}
+
+function logDoubleScan(awb){
+  const payload={
+    action:'doubleScan',awb:String(awb||'').trim(),
+    module:moduleName||'',
+    username:session?session.username:'',
+    origin:session?session.origin:'',
+    driverName:$('driverName')?$('driverName').value.trim():'',
+    plateNo:$('plateNo')?$('plateNo').value.trim():'',
+    vendor:$('vendor')?$('vendor').value:''
+  };
+  const fd=new URLSearchParams();
+  fd.set('payload',JSON.stringify(payload));
+  fetch(API_URL,{method:'POST',mode:'no-cors',
+    headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+    body:fd.toString()}).catch(console.warn);
+  status('saveStatus','AWB '+awb+' terdeteksi double dan dicatat ke Double Scan.','bad');
+  if(navigator.vibrate)navigator.vibrate([120,80,120]);
+}
 
 async function saveData(){await stopScanner();closeDriverCamera();closeSnCamera();const v=validate();if(v)return status('saveStatus',v,'bad');const requestId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));const payload={requestId,module:moduleName,username:session.username,origin:session.origin,awbs,driverName:$('driverName').value.trim(),plateNo:$('plateNo').value.trim().toUpperCase(),vendor:$('vendor').value,keterangan:$('keterangan').value,reason:$('reason').value.trim(),driverPhoto,sns:snItems.map(()=>''),snPhotos:snItems.map(x=>x.photo)};$('saveBtn').disabled=true;status('saveStatus','Mengupload foto dan menyimpan data...','wait');try{if(API_URL.includes('PASTE_'))throw new Error('Isi API_URL pada index.html dengan URL Apps Script /exec'); const fd=new URLSearchParams();fd.set('payload',JSON.stringify(payload)); await fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:fd.toString()}); const ok=await waitStatus(requestId);if(!ok.ok)throw new Error(ok.message||'Gagal menyimpan');status('saveStatus',ok.message||'Data tersimpan','ok');setTimeout(()=>goHome(),1200)}catch(e){status('saveStatus',e.message,'bad')}finally{$('saveBtn').disabled=false}}
 async function waitStatus(id){
