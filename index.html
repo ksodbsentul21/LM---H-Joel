@@ -285,9 +285,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
       <div id="snSection" class="hidden">
         <div class="sectionCap">FOTO SN (BERULANG – SESUAI JUMLAH AWB)</div>
         <div class="photoBox">
-          <button class="btn primary" onclick="document.getElementById('snPhotoInput').click()">📷 AMBIL FOTO SN</button>
-          <input id="snPhotoInput" class="hidden" type="file" accept="image/*" capture="environment">
-          <div id="snFileReader" class="hidden"></div>
+          <button class="btn primary" id="btnOpenSnCamera" type="button" onclick="openSnCamera()">📷 BUKA KAMERA SN</button>
+
+          <div id="snCameraBox" class="cameraBox">
+            <video id="snVideo" autoplay playsinline muted></video>
+            <div class="cameraActions">
+              <button class="btn primary" type="button" onclick="captureSnPhoto()">📸 AMBIL FOTO SN</button>
+              <button class="btn danger" type="button" onclick="closeSnCamera()">TUTUP</button>
+            </div>
+          </div>
+
           <div class="progress" id="ocrProgress"></div>
           <div id="snList"></div>
           <div id="snPreview" class="hidden"></div>
@@ -320,7 +327,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 // GANTI setelah deploy Apps Script Web App (/exec)
 const API_URL = 'https://script.google.com/macros/s/AKfycbwvSTmZkm9CGrEW3kJG8Du_THFSNX0fE49y97wElfXzANkfewhp-LuMtyPqZD8P4DWwCg/exec';
 let cfg={vendor:[],keterangan:[],users:[]}, session=null, moduleName='', awbs=[], snItems=[], driverPhoto='';
-let scanner=null, scanLock=false, driverPhotoStream=null;
+let scanner=null, scanLock=false, driverPhotoStream=null, snPhotoStream=null;
 
 const $=id=>document.getElementById(id);
 function status(id,msg,type='wait'){const el=$(id);el.className='status show '+type;el.textContent=msg}
@@ -331,9 +338,9 @@ function fillSelect(id,arr){const el=$(id),first=el.options[0]?.outerHTML||'<opt
 async function login(){hideStatus('loginStatus');const u=$('usernameInput').value.trim();if(!u)return status('loginStatus','Username wajib diisi','bad');status('loginStatus','Memeriksa username...','wait');try{const d=await jsonp({action:'login',username:u});if(!d.ok)throw new Error(d.message);session={username:d.username,origin:d.origin};localStorage.setItem('hjoelSession',JSON.stringify(session));showHome()}catch(e){status('loginStatus',e.message,'bad')}}
 function showHome(){$('loginView').classList.add('hidden');$('formView').classList.add('hidden');$('homeView').classList.remove('hidden');$('sessUser').textContent=session.username;$('sessOrigin').textContent=session.origin}
 function logout(){localStorage.removeItem('hjoelSession');session=null;$('homeView').classList.add('hidden');$('formView').classList.add('hidden');$('loginView').classList.remove('hidden');$('usernameInput').value=''}
-async function goHome(){await stopScanner();closeDriverCamera();resetForm();showHome()}
+async function goHome(){await stopScanner();closeDriverCamera();closeSnCamera();resetForm();showHome()}
 function openModule(m){moduleName=m;resetForm();$('homeView').classList.add('hidden');$('formView').classList.remove('hidden');$('formTitle').textContent=m==='outbound'?'OUTBOUND':m==='bast'?'BAST BACK':'RETURN';$('formHint').textContent=m==='outbound'?'AWB dan Foto SN dapat ditambahkan berulang.':m==='bast'?'AWB dapat di-scan berulang.':'Return hanya menerima 1 AWB.';$('snSection').classList.toggle('hidden',m==='bast');$('returnExtra').classList.toggle('hidden',m!=='return');$('driverPhotoSection').classList.toggle('hidden',m==='return')}
-function resetForm(){awbListCollapsed=false;awbs=[];snItems=[];driverPhoto='';['driverName','plateNo','reason'].forEach(x=>$(x).value='');['vendor','keterangan'].forEach(x=>$(x).selectedIndex=0);$('snPhotoInput').value='';closeDriverCamera();$('driverPreview').innerHTML='';$('btnRetakeDriver').classList.add('hidden');$('btnOpenDriverCamera').classList.remove('hidden');$('snPreview').innerHTML='';$('ocrProgress').textContent='';hideStatus('saveStatus');renderAWB();renderSN();if($('awbList'))$('awbList').classList.remove('hidden');if($('awbToggleBtn'))$('awbToggleBtn').textContent='MINIMIZE⌃';enforceSnLimit()}
+function resetForm(){closeSnCamera();awbListCollapsed=false;awbs=[];snItems=[];driverPhoto='';['driverName','plateNo','reason'].forEach(x=>$(x).value='');['vendor','keterangan'].forEach(x=>$(x).selectedIndex=0);closeDriverCamera();$('driverPreview').innerHTML='';$('btnRetakeDriver').classList.add('hidden');$('btnOpenDriverCamera').classList.remove('hidden');$('snPreview').innerHTML='';$('ocrProgress').textContent='';hideStatus('saveStatus');renderAWB();renderSN();if($('awbList'))$('awbList').classList.remove('hidden');if($('awbToggleBtn'))$('awbToggleBtn').textContent='MINIMIZE⌃';enforceSnLimit()}
 function addAWB(v){v=String(v||'').trim();if(!v)return;if(moduleName==='return'&&awbs.length){awbs=[v]}else if(!awbs.includes(v))awbs.push(v);renderAWB();beep()}
 function manualAWB(){
   const overlay=$('awbModalOverlay');
@@ -518,27 +525,204 @@ function beepDuplicate(){
   }catch(e){}
 }
 
-async function readTopBarcodeFromImage(file){
+
+async function openSnCamera(){
+  hideStatus('saveStatus');
+
+  if(awbs.length===0){
+    return status(
+      'saveStatus',
+      'Scan / Input AWB terlebih dahulu sebelum mengambil Foto SN.',
+      'bad'
+    );
+  }
+
+  if(snItems.length>=awbs.length){
+    return status(
+      'saveStatus',
+      'Jumlah Foto SN sudah sesuai jumlah AWB ('+awbs.length+').',
+      'bad'
+    );
+  }
+
+  await stopScanner();
+  closeDriverCamera();
+  closeSnCamera();
+
+  try{
+    snPhotoStream=await navigator.mediaDevices.getUserMedia({
+      video:{
+        facingMode:{ideal:'environment'}
+      },
+      audio:false
+    });
+
+    const video=$('snVideo');
+    video.srcObject=snPhotoStream;
+    await video.play();
+
+    $('snCameraBox').style.display='block';
+    $('btnOpenSnCamera').classList.add('hidden');
+
+    $('ocrProgress').textContent=
+      'Kamera SN aktif. Foto '+(snItems.length+1)+' dari maksimal '+awbs.length+'.';
+
+  }catch(e){
+    console.error(e);
+    status(
+      'saveStatus',
+      'Kamera SN tidak dapat dibuka. Izinkan akses kamera.',
+      'bad'
+    );
+  }
+}
+
+
+async function captureSnPhoto(){
+  if(awbs.length===0){
+    return status(
+      'saveStatus',
+      'Scan / Input AWB terlebih dahulu.',
+      'bad'
+    );
+  }
+
+  if(snItems.length>=awbs.length){
+    closeSnCamera();
+    return status(
+      'saveStatus',
+      'Foto SN sudah mencapai batas sesuai jumlah AWB ('+awbs.length+').',
+      'bad'
+    );
+  }
+
+  const video=$('snVideo');
+
+  if(!video.videoWidth || !video.videoHeight){
+    return status(
+      'saveStatus',
+      'Kamera SN belum siap.',
+      'bad'
+    );
+  }
+
+  const canvas=document.createElement('canvas');
+
+  let width=video.videoWidth;
+  let height=video.videoHeight;
+
+  if(width>1280){
+    height=Math.round(height*1280/width);
+    width=1280;
+  }
+
+  canvas.width=width;
+  canvas.height=height;
+
+  canvas
+    .getContext('2d')
+    .drawImage(video,0,0,width,height);
+
+  const photo=canvas.toDataURL('image/jpeg',.72);
+
+  $('ocrProgress').textContent=
+    'Membaca No SN dari barcode paling atas...';
+
+  let sn='';
+
+  try{
+    sn=await readTopBarcodeFromCanvas(canvas);
+  }catch(e){
+    console.warn('Auto baca SN gagal:',e);
+  }
+
+  snItems.push({
+    sn:sn || '',
+    photo:photo
+  });
+
+  renderSN();
+  successSnBeep();
+
+  if(navigator.vibrate){
+    navigator.vibrate(100);
+  }
+
+  const taken=snItems.length;
+  const max=awbs.length;
+
+  if(sn){
+    $('ocrProgress').textContent=
+      'No SN terbaca: '+sn+' · Foto SN '+taken+'/'+max;
+  }else{
+    $('ocrProgress').textContent=
+      'Foto SN '+taken+'/'+max+' tersimpan. No SN belum terbaca, silakan isi manual.';
+  }
+
+  // Kamera tetap aktif agar bisa foto SN berikutnya seperti scan berulang.
+  if(taken>=max){
+    closeSnCamera();
+    status(
+      'saveStatus',
+      'Jumlah Foto SN sudah lengkap sesuai jumlah AWB ('+max+').',
+      'ok'
+    );
+  }
+}
+
+
+function closeSnCamera(){
+  if(snPhotoStream){
+    snPhotoStream
+      .getTracks()
+      .forEach(track=>track.stop());
+
+    snPhotoStream=null;
+  }
+
+  const video=$('snVideo');
+
+  if(video){
+    video.srcObject=null;
+  }
+
+  if($('snCameraBox')){
+    $('snCameraBox').style.display='none';
+  }
+
+  if($('btnOpenSnCamera')){
+    $('btnOpenSnCamera').classList.remove('hidden');
+  }
+}
+
+
+async function readTopBarcodeFromCanvas(canvas){
   /*
-    Prioritas 1: BarcodeDetector bila tersedia.
-    Semua barcode yang terdeteksi diurutkan berdasarkan posisi Y,
-    sehingga barcode paling atas dipilih sebagai No SN.
+    BarcodeDetector diprioritaskan.
+    Bila ada beberapa barcode dalam satu foto,
+    barcode dengan posisi paling atas dipilih sebagai No SN.
   */
   if('BarcodeDetector' in window){
     try{
       const supported=await BarcodeDetector.getSupportedFormats();
+
       const wanted=[
-        'code_128','code_39','code_93','codabar',
-        'ean_13','ean_8','itf','upc_a','upc_e'
-      ].filter(x=>supported.includes(x));
+        'code_128',
+        'code_39',
+        'code_93',
+        'codabar',
+        'ean_13',
+        'ean_8',
+        'itf',
+        'upc_a',
+        'upc_e'
+      ].filter(format=>supported.includes(format));
 
       const detector=new BarcodeDetector(
         wanted.length ? {formats:wanted} : undefined
       );
 
-      const bitmap=await createImageBitmap(file);
-      const codes=await detector.detect(bitmap);
-      bitmap.close && bitmap.close();
+      const codes=await detector.detect(canvas);
 
       if(codes && codes.length){
         codes.sort((a,b)=>{
@@ -548,18 +732,44 @@ async function readTopBarcodeFromImage(file){
         });
 
         const top=String(codes[0].rawValue||'').trim();
-        if(top) return top;
+
+        if(top){
+          return top;
+        }
       }
-    }catch(err){
-      console.warn('BarcodeDetector gagal, lanjut fallback:',err);
+    }catch(e){
+      console.warn('BarcodeDetector gagal:',e);
     }
   }
 
   /*
-    Prioritas 2: html5-qrcode.
-    Library ini juga dapat membaca barcode 1D seperti CODE_128.
+    Fallback html5-qrcode:
+    ubah canvas ke File lalu scan sebagai gambar.
   */
   try{
+    const blob=await new Promise(resolve=>{
+      canvas.toBlob(resolve,'image/jpeg',.92);
+    });
+
+    if(!blob){
+      return '';
+    }
+
+    const file=new File(
+      [blob],
+      'sn.jpg',
+      {type:'image/jpeg'}
+    );
+
+    let temp=$('snFileReaderDynamic');
+
+    if(!temp){
+      temp=document.createElement('div');
+      temp.id='snFileReaderDynamic';
+      temp.className='hidden';
+      document.body.appendChild(temp);
+    }
+
     const formats=[
       Html5QrcodeSupportedFormats.CODE_128,
       Html5QrcodeSupportedFormats.CODE_39,
@@ -572,23 +782,50 @@ async function readTopBarcodeFromImage(file){
       Html5QrcodeSupportedFormats.UPC_E
     ].filter(Boolean);
 
-    const reader=new Html5Qrcode(
-      'snFileReader',
+    const qr=new Html5Qrcode(
+      'snFileReaderDynamic',
       {formatsToSupport:formats}
     );
 
-    const result=await reader.scanFile(file,true);
+    const result=await qr.scanFile(file,true);
 
-    try{reader.clear()}catch(_){}
+    try{
+      qr.clear();
+    }catch(_){}
 
     return String(result||'').trim();
 
-  }catch(err){
-    console.warn('html5-qrcode gagal membaca Foto SN:',err);
+  }catch(e){
+    console.warn('Fallback html5-qrcode gagal:',e);
   }
 
   return '';
 }
+
+
+function successSnBeep(){
+  try{
+    const audio=
+      new(
+        window.AudioContext ||
+        window.webkitAudioContext
+      )();
+
+    const oscillator=audio.createOscillator();
+    const gain=audio.createGain();
+
+    oscillator.connect(gain);
+    gain.connect(audio.destination);
+
+    oscillator.frequency.value=1050;
+    gain.gain.value=.10;
+
+    oscillator.start();
+    oscillator.stop(audio.currentTime+.12);
+
+  }catch(e){}
+}
+
 
 async function compressFile(file,max=1280,q=.72){const data=await fileToDataURL(file);const img=await loadImg(data);let w=img.width,h=img.height;if(Math.max(w,h)>max){const r=max/Math.max(w,h);w=Math.round(w*r);h=Math.round(h*r)}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);return c.toDataURL('image/jpeg',q)}
 function fileToDataURL(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)})} function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src})}
@@ -641,73 +878,12 @@ function closeDriverCamera(){
   if(!driverPhoto && $('btnOpenDriverCamera'))$('btnOpenDriverCamera').classList.remove('hidden');
 }
 
-$('snPhotoInput').addEventListener('change',async e=>{
-  const f=e.target.files[0];
-  if(!f)return;
 
-  const maxSn=awbs.length;
-
-  if(maxSn===0){
-    status('saveStatus','Scan / input AWB terlebih dahulu sebelum Foto SN.','bad');
-    e.target.value='';
-    return;
-  }
-
-  if(snItems.length>=maxSn){
-    status(
-      'saveStatus',
-      'Jumlah Foto SN sudah mencapai batas sesuai jumlah AWB ('+maxSn+').',
-      'bad'
-    );
-    e.target.value='';
-    return;
-  }
-
-  $('ocrProgress').textContent='Membaca No SN dari barcode paling atas...';
-
-  try{
-    const photo=await compressFile(f);
-    const sn=await readTopBarcodeFromImage(f);
-
-    snItems.push({
-      sn:sn || '',
-      photo:photo
-    });
-
-    renderSN();
-
-    if(sn){
-      $('ocrProgress').textContent=
-        'No SN berhasil terbaca otomatis: '+sn+
-        ' · Foto SN '+snItems.length+'/'+maxSn;
-    }else{
-      $('ocrProgress').textContent=
-        'Foto SN tersimpan, tetapi No SN belum terbaca. Silakan isi No SN manual pada kolom.';
-    }
-
-  }catch(err){
-    console.error(err);
-
-    const photo=await compressFile(f);
-
-    snItems.push({
-      sn:'',
-      photo:photo
-    });
-
-    renderSN();
-
-    $('ocrProgress').textContent=
-      'Foto SN tersimpan, tetapi barcode tidak berhasil dibaca. Silakan isi No SN manual.';
-  }
-
-  e.target.value='';
-});
 function validate(){if(!awbs.length)return 'AWB belum di-scan';if(moduleName==='return'&&awbs.length!==1)return 'Return harus 1 AWB';if(!$('driverName').value.trim())return 'Nama Driver wajib diisi';if(!$('plateNo').value.trim())return 'Plat No wajib diisi';if(!$('vendor').value)return 'Vendor wajib dipilih';if(moduleName!=='return'&&!driverPhoto)return 'Foto Driver wajib diambil';if(moduleName==='return'&&!$('keterangan').value)return 'Keterangan wajib dipilih';if(moduleName==='return'&&!$('reason').value.trim())return 'Reason wajib diisi';if((moduleName==='outbound'||moduleName==='return')&&!snItems.length)return 'Foto SN wajib diambil';
 if(snItems.length>awbs.length)return 'Jumlah Foto SN tidak boleh melebihi jumlah AWB';
 if(snItems.some(x=>!String(x.sn||'').trim()))return 'Masih ada No SN yang kosong / belum terbaca';
 return ''}
-async function saveData(){await stopScanner();closeDriverCamera();const v=validate();if(v)return status('saveStatus',v,'bad');const requestId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));const payload={requestId,module:moduleName,username:session.username,origin:session.origin,awbs,driverName:$('driverName').value.trim(),plateNo:$('plateNo').value.trim().toUpperCase(),vendor:$('vendor').value,keterangan:$('keterangan').value,reason:$('reason').value.trim(),driverPhoto,sns:snItems.map(x=>x.sn),snPhotos:snItems.map(x=>x.photo)};$('saveBtn').disabled=true;status('saveStatus','Mengirim data...','wait');try{if(API_URL.includes('PASTE_'))throw new Error('Isi API_URL pada index.html dengan URL Apps Script /exec'); const fd=new URLSearchParams();fd.set('payload',JSON.stringify(payload)); await fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:fd.toString()}); const ok=await waitStatus(requestId);if(!ok.ok)throw new Error(ok.message||'Gagal menyimpan');status('saveStatus',ok.message||'Data tersimpan','ok');setTimeout(()=>goHome(),1200)}catch(e){status('saveStatus',e.message,'bad')}finally{$('saveBtn').disabled=false}}
+async function saveData(){await stopScanner();closeDriverCamera();closeSnCamera();const v=validate();if(v)return status('saveStatus',v,'bad');const requestId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));const payload={requestId,module:moduleName,username:session.username,origin:session.origin,awbs,driverName:$('driverName').value.trim(),plateNo:$('plateNo').value.trim().toUpperCase(),vendor:$('vendor').value,keterangan:$('keterangan').value,reason:$('reason').value.trim(),driverPhoto,sns:snItems.map(x=>x.sn),snPhotos:snItems.map(x=>x.photo)};$('saveBtn').disabled=true;status('saveStatus','Mengirim data...','wait');try{if(API_URL.includes('PASTE_'))throw new Error('Isi API_URL pada index.html dengan URL Apps Script /exec'); const fd=new URLSearchParams();fd.set('payload',JSON.stringify(payload)); await fetch(API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:fd.toString()}); const ok=await waitStatus(requestId);if(!ok.ok)throw new Error(ok.message||'Gagal menyimpan');status('saveStatus',ok.message||'Data tersimpan','ok');setTimeout(()=>goHome(),1200)}catch(e){status('saveStatus',e.message,'bad')}finally{$('saveBtn').disabled=false}}
 async function waitStatus(id){for(let i=0;i<12;i++){await new Promise(r=>setTimeout(r,1000));try{const d=await jsonp({action:'status',requestId:id},5000);if(!d.pending)return d}catch(e){}}throw new Error('Server belum memberi konfirmasi. Cek Apps Script dan Sheet.')}
 
 (async()=>{if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});await loadConfig();try{session=JSON.parse(localStorage.getItem('hjoelSession')||'null')}catch(_){ } if(session){try{const d=await jsonp({action:'login',username:session.username});if(d.ok&&d.origin===session.origin)showHome();else logout()}catch(_){logout()}}})();
