@@ -495,6 +495,21 @@ function fillSelect(id,arr){
     el.appendChild(o);
   });
 }
+async function refreshConfig(){
+  try{
+    const d=await jsonp({action:'config'});
+    if(!d || !d.ok) throw new Error((d&&d.message)||'Gagal mengambil konfigurasi');
+    cfg=d;
+    fillSelect('vendor',Array.isArray(d.vendor)?d.vendor:[]);
+    fillSelect('keterangan',Array.isArray(d.keterangan)?d.keterangan:[]);
+    return true;
+  }catch(e){
+    console.error('refreshConfig:',e);
+    status('saveStatus','Gagal memperbarui Vendor dari Google Sheet: '+e.message,'bad');
+    return false;
+  }
+}
+
 async function login(){
   hideStatus('loginStatus');
   const u=$('usernameInput').value.trim();
@@ -533,8 +548,11 @@ async function login(){
 function showHome(){$('loginView').classList.add('hidden');$('formView').classList.add('hidden');$('homeView').classList.remove('hidden');$('sessUser').textContent=session.username;$('sessOrigin').textContent=session.origin}
 function logout(){localStorage.removeItem('hjoelSession');session=null;$('homeView').classList.add('hidden');$('formView').classList.add('hidden');$('loginView').classList.remove('hidden');$('usernameInput').value=''}
 async function goHome(){await stopScanner();closeDriverCamera();closeSnCamera();resetForm();showHome()}
-function openModule(m){
+async function openModule(m){
   moduleName=m;
+
+  // Selalu ambil Vendor/Keterangan terbaru dari Google Sheet.
+  await refreshConfig();
 
   // Tampilkan form lebih dulu, baru reset dan tentukan tahap.
   $('homeView').classList.add('hidden');
